@@ -1,0 +1,80 @@
+<Window xmlns="https://github.com/avaloniaui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    xmlns:local="clr-namespace:Ava;assembly=Ava"
+    mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="600"
+    x:Class="Ava.MainWindow"
+    x:CompileBindings="False"
+    Width="1500"
+    Title="Barrier Pulse App">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <!-- Barrier Controls -->
+        <ScrollViewer Grid.Row="0" VerticalScrollBarVisibility="Auto">
+            <ItemsControl ItemsSource="{Binding Barriers}">
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <WrapPanel Orientation="Horizontal" />
+                    </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <Border BorderBrush="Gray" BorderThickness="1" Margin="5" Padding="10">
+                            <StackPanel Orientation="Vertical">
+                                <TextBlock Text="{Binding Name}" FontWeight="Bold" />
+                                <ToggleSwitch IsChecked="{Binding IsEnabled}" Content="Enabled" />
+                                <Button Content="Send Pulse" Command="{Binding SendPulseCommand}" />
+                            </StackPanel>
+                        </Border>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </ScrollViewer>
+
+        <!-- Console Log -->
+        <Grid Grid.Row="1">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="*" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+            <ScrollViewer x:Name="LogScrollViewer" Grid.Row="0" VerticalScrollBarVisibility="Auto">
+                <TextBox IsReadOnly="true" Text="{Binding LogText}" Margin="5"
+                    FontFamily="Consolas" AcceptsReturn="True" TextWrapping="Wrap" />
+            </ScrollViewer>
+            <ToggleButton Grid.Row="1" Content="Auto Scroll" HorizontalAlignment="Right"
+                Margin="5" IsChecked="{Binding IsAutoScrollEnabled}" />
+        </Grid>
+
+        <!-- Pulse Indicators -->
+        <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto">
+            <ItemsControl ItemsSource="{Binding Barriers}">
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <WrapPanel Orientation="Horizontal" />
+                    </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <Border BorderBrush="Gray" BorderThickness="1" Margin="5" Padding="10">
+                            <StackPanel Orientation="Vertical">
+                                <TextBlock Text="{Binding Name}" FontWeight="Bold" />
+                                <TextBlock Text="{Binding LastNumberPlate}" />
+                                <Border Background="{Binding IndicatorColor}" Width="80" Height="30"
+                                    CornerRadius="4">
+                                    <TextBlock Text="Pulse" HorizontalAlignment="Center"
+                                        VerticalAlignment="Center" />
+                                </Border>
+                            </StackPanel>
+                        </Border>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </ScrollViewer>
+    </Grid>
+</Window>
