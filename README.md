@@ -18,7 +18,7 @@ This application controls multiple barriers that open/close based on vehicle tra
 
 ## Architecture
 
-The application follows SOLID principles with a layered architecture:
+The application follows SOLID principles with a clean layered architecture and dependency injection:
 
 ### Layers
 
@@ -27,25 +27,79 @@ The application follows SOLID principles with a layered architecture:
 - **Domain (Models)**: Data models and domain entities
 - **Infrastructure (Repositories)**: Data access abstractions
 
+### SOLID Principles Implementation
+
+#### **Single Responsibility**
+
+- Each service handles one specific concern (logging, scheduling, number plates, barriers)
+- Repositories focus solely on data access
+- ViewModels manage UI state and coordinate services
+
+#### **Open/Closed**
+
+- Interfaces allow extension without modifying existing code
+- Services can be swapped with different implementations
+
+#### **Liskov Substitution**
+
+- All implementations properly substitute their interfaces
+- BarrierViewModel can work with any IBarrierService implementation
+
+#### **Interface Segregation**
+
+- Focused interfaces that clients actually need
+- `INumberPlateService`, `IBarrierService`, `ISchedulingService`, `ILoggingService`, `ITransactionRepository`
+
+#### **Dependency Inversion**
+
+- High-level modules (ViewModels) depend on abstractions (interfaces)
+- Low-level modules (Services) implement interfaces
+- Dependencies injected through constructors
+
 ### Core Components
 
 - **MainWindowViewModel**: Orchestrates application startup, configuration, and service coordination
 - **BarrierViewModel**: Manages individual barrier state and operations
-- **Services**: Business logic implementations (Number Plate, Barrier, Scheduling, Logging)
-- **Repositories**: Data access layer for transactions
+- **Services**: Business logic implementations with interfaces
+- **Repositories**: Data access layer with SQLite
 - **Models**: Domain entities (Transaction, NumberPlateEntry)
 
-### Key Interfaces
+### Key Interfaces & Implementations
 
-- `INumberPlateService`: Manages authorized number plates and validation
-- `IBarrierService`: Handles barrier hardware communication
-- `ISchedulingService`: Quartz.NET job scheduling
-- `ILoggingService`: Application logging
-- `ITransactionRepository`: Transaction data access
+- `INumberPlateService` → `NumberPlateService`: Manages authorized plates, validation, API fallback logic
+- `IBarrierService` → `BarrierService`: Handles barrier hardware communication
+- `ISchedulingService` → `SchedulingService`: Quartz.NET job orchestration
+- `ILoggingService` → `LoggingService`: Centralized logging with UI integration
+- `ITransactionRepository` → `TransactionRepository`: Transaction data access
 
 ### Dependency Injection
 
-Services are injected into view models, promoting loose coupling and testability. In production, use a DI container like Microsoft.Extensions.DependencyInjection.
+Services are manually injected in `MainWindow.xaml.cs`. In production, use a DI container like:
+
+- Microsoft.Extensions.DependencyInjection
+- Autofac
+- Ninject
+
+### Project Structure
+
+```
+├── Models/                 # Domain entities
+│   ├── Transaction.cs
+│   └── NumberPlateEntry.cs
+├── Repositories/           # Data access layer
+│   ├── ITransactionRepository.cs
+│   └── TransactionRepository.cs
+├── Services/              # Business logic services
+│   ├── ILoggingService.cs & LoggingService.cs
+│   ├── INumberPlateService.cs & NumberPlateService.cs
+│   ├── IBarrierService.cs & BarrierService.cs
+│   └── ISchedulingService.cs & SchedulingService.cs
+├── ViewModels/            # MVVM view models
+│   ├── MainWindowViewModel.cs
+│   └── BarrierViewModel.cs
+├── Config.cs              # Configuration classes
+└── appsettings.json       # Application settings
+```
 
 ## Configuration
 
