@@ -40,12 +40,20 @@ namespace Ava.Services
                 if (response.IsSuccessStatusCode)
                 {
                     var json = await response.Content.ReadAsStringAsync();
-                    var newPlates = JsonSerializer.Deserialize<List<NumberPlateEntry>>(json);
+                    var options = new JsonSerializerOptions
+                    {
+                        PropertyNameCaseInsensitive = true
+                    };
+                    var newPlates = JsonSerializer.Deserialize<List<NumberPlateEntry>>(json, options);
                     if (newPlates != null)
                     {
                         _numberPlates.Clear();
                         _numberPlates.AddRange(newPlates);
-                        _loggingService.Log($"Fetched {newPlates.Count} number plates.");
+                        _loggingService.Log($"Fetched {newPlates.Count} number plates:");
+                        foreach (var plate in newPlates)
+                        {
+                            _loggingService.Log($"  - {plate.Plate} (valid {plate.Start:yyyy-MM-dd HH:mm} to {plate.Finish:yyyy-MM-dd HH:mm})");
+                        }
                     }
                     else
                     {
