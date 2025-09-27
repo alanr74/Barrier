@@ -4,6 +4,6 @@ namespace Ava.Services
 {
     public interface IBarrierService
     {
-        Task SendPulseAsync(string apiUrl, string barrierName);
+        Task<bool> SendPulseAsync(string apiUrl, string barrierName);
     }
 }

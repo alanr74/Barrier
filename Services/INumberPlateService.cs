@@ -6,8 +6,9 @@ namespace Ava.Services
 {
     public interface INumberPlateService
     {
-        Task FetchNumberPlatesAsync();
+        Task<bool> FetchNumberPlatesAsync();
         bool IsValidPlate(string plate, int direction);
+        string? GetValidationReason(string plate, int direction);
         bool AllowAnyPlate { get; }
     }
 }

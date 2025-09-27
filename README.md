@@ -1,5 +1,11 @@
 # Barrier Control System
 
+## Recent Changes
+
+- Migrated from .NET 9 preview to .NET 8 for stability
+- Removed unit tests project to simplify the codebase
+- Enhanced logging for invalid plate validation with specific reasons (not found, expired, not yet valid)
+
 A C# Avalonia-based desktop application for managing automated barrier controls with number plate validation and scheduling.
 
 ## Overview
@@ -146,6 +152,33 @@ Services are manually injected in `MainWindow.xaml.cs`. In production, use a DI 
 - **Fetch Number Plates**: Button to manually trigger API data fetch
 - **Send Pulse**: Individual barrier control buttons
 
+### Flow Diagram
+
+```mermaid
+graph TD
+    A[Start Cron Job for Barrier] --> B[Get Next Unprocessed Transaction]
+    B --> C{Transaction Exists?}
+    C -->|No| D[Log: No pending transactions, skip pulse]
+    C -->|Yes| E[Update Last Processed Date]
+    E --> F{Is Direction 'In' (1)?}
+    F -->|No (Out)| G[Log: Out transaction, send pulse]
+    F -->|Yes| H[Is AllowAnyPlate?]
+    H -->|Yes| G
+    H -->|No| I[Validate Plate: IsValidPlate?]
+    I -->|Yes| G
+    I -->|No| J[Get Validation Reason]
+    J --> K[Log: Invalid plate with reason, skip pulse]
+    G --> L[Send Pulse to Barrier API]
+    L --> M{Success?}
+    M -->|Yes| N[Log: Pulse sent successfully<br/>Set Indicator Green]
+    M -->|No| O[Log: Pulse failed<br/>Set Indicator Red]
+    N --> P[Mark Transaction as Sent]
+    O --> P
+    P --> Q[End Job]
+    D --> Q
+    K --> Q
+```
+
 ## Database Schema
 
 ### Transactions Table
@@ -242,6 +275,7 @@ All operations are logged to the UI console with timestamps:
 - Transaction processing
 - Barrier operations
 - Error conditions
+- Detailed invalid plate reasons (e.g., "Plate 'ABC123' not found in authorized list")
 
 ## Error Handling
 

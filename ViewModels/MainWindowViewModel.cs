@@ -7,56 +7,90 @@ using ReactiveUI;
 using Ava.Models;
 using Ava.Repositories;
 using Ava.Services;
+using Avalonia.Media;
 
 namespace Ava.ViewModels
 {
-    public class MainWindowViewModel : ReactiveObject
-    {
-        private string _logText = "Application started.\n";
-        private bool _isAutoScrollEnabled = true;
-
-        public static MainWindowViewModel? Instance { get; private set; }
-
-        public ObservableCollection<BarrierViewModel> Barriers { get; } = new();
-        public ITransactionRepository TransactionRepository { get; }
-        public INumberPlateService NumberPlateService { get; }
-        public IBarrierService BarrierService { get; }
-        public ISchedulingService SchedulingService { get; }
-        public ILoggingService LoggingService { get; }
-
-        public string LogText
+        public class MainWindowViewModel : ReactiveObject
         {
-            get => _logText;
-            set => this.RaiseAndSetIfChanged(ref _logText, value);
-        }
+            private string _logText = "Application started.\n";
+            private bool _isAutoScrollEnabled = true;
+            private string _numberPlateApiStatus = "Waiting";
+            private IBrush _numberPlateApiColor = Brushes.Orange; // Amber for waiting
 
-        public bool IsAutoScrollEnabled
-        {
-            get => _isAutoScrollEnabled;
-            set => this.RaiseAndSetIfChanged(ref _isAutoScrollEnabled, value);
-        }
+            public static MainWindowViewModel? Instance { get; private set; }
 
-    public ReactiveCommand<System.Reactive.Unit, System.Reactive.Unit> FetchNumberPlatesCommand { get; }
+            public ObservableCollection<BarrierViewModel> Barriers { get; } = new();
+            public ITransactionRepository TransactionRepository { get; }
+            public INumberPlateService NumberPlateService { get; }
+            public IBarrierService BarrierService { get; }
+            public ISchedulingService SchedulingService { get; }
+            public ILoggingService LoggingService { get; }
 
-    public MainWindowViewModel(
-            ITransactionRepository transactionRepository,
-            INumberPlateService numberPlateService,
-            IBarrierService barrierService,
-            ISchedulingService schedulingService,
-            ILoggingService loggingService)
-        {
-            Instance = this;
-            TransactionRepository = transactionRepository;
-            NumberPlateService = numberPlateService;
-            BarrierService = barrierService;
-            SchedulingService = schedulingService;
-            LoggingService = loggingService;
+            public static DateTime AppStartupTime { get; private set; }
 
-            FetchNumberPlatesCommand = ReactiveCommand.CreateFromTask(() => NumberPlateService.FetchNumberPlatesAsync());
+            public string LogText
+            {
+                get => _logText;
+                set => this.RaiseAndSetIfChanged(ref _logText, value);
+            }
 
-            LoadConfiguration();
-            InitializeApplication();
-        }
+            public bool IsAutoScrollEnabled
+            {
+                get => _isAutoScrollEnabled;
+                set => this.RaiseAndSetIfChanged(ref _isAutoScrollEnabled, value);
+            }
+
+            public string NumberPlateApiStatus
+            {
+                get => _numberPlateApiStatus;
+                set => this.RaiseAndSetIfChanged(ref _numberPlateApiStatus, value);
+            }
+
+            public IBrush NumberPlateApiColor
+            {
+                get => _numberPlateApiColor;
+                set => this.RaiseAndSetIfChanged(ref _numberPlateApiColor, value);
+            }
+
+        public ReactiveCommand<System.Reactive.Unit, System.Reactive.Unit> FetchNumberPlatesCommand { get; }
+
+        public MainWindowViewModel(
+                ITransactionRepository transactionRepository,
+                INumberPlateService numberPlateService,
+                IBarrierService barrierService,
+                ISchedulingService schedulingService,
+                ILoggingService loggingService)
+            {
+                AppStartupTime = DateTime.Now;
+
+                Instance = this;
+                TransactionRepository = transactionRepository;
+                NumberPlateService = numberPlateService;
+                BarrierService = barrierService;
+                SchedulingService = schedulingService;
+                LoggingService = loggingService;
+
+                FetchNumberPlatesCommand = ReactiveCommand.CreateFromTask(async () =>
+                {
+                    NumberPlateApiStatus = "Fetching...";
+                    NumberPlateApiColor = Brushes.Orange;
+                    var success = await NumberPlateService.FetchNumberPlatesAsync();
+                    if (success)
+                    {
+                        NumberPlateApiStatus = "Success";
+                        NumberPlateApiColor = Brushes.Green;
+                    }
+                    else
+                    {
+                        NumberPlateApiStatus = "Failed";
+                        NumberPlateApiColor = Brushes.Red;
+                    }
+                });
+
+                LoadConfiguration();
+                InitializeApplication();
+            }
 
         private void LoadConfiguration()
         {
@@ -74,7 +108,7 @@ namespace Ava.ViewModels
                 var barrierKey = $"Barrier{i}";
                 if (appConfig.Barriers.Barriers.TryGetValue(barrierKey, out var barrierConfig))
                 {
-                    var barrierVm = new BarrierViewModel(barrierKey, barrierConfig.CronExpression, barrierConfig.ApiUrl, barrierConfig.LaneId, BarrierService, LoggingService, NumberPlateService, TransactionRepository);
+                    var barrierVm = new BarrierViewModel(barrierKey, barrierConfig.CronExpression, barrierConfig.ApiUrl, barrierConfig.LaneId, BarrierService, LoggingService, NumberPlateService, TransactionRepository, AppStartupTime);
                     Barriers.Add(barrierVm);
                     LoggingService.Log($"Added barrier {barrierKey} with LaneId {barrierConfig.LaneId}");
                 }

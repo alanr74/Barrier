@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 using Quartz;
 using Quartz.Impl;
 using Ava.ViewModels;
+using Avalonia.Media;
 
 namespace Ava.Services
 {
@@ -91,7 +92,19 @@ namespace Ava.Services
             var instance = MainWindowViewModel.Instance;
             if (instance != null)
             {
-                await instance.NumberPlateService.FetchNumberPlatesAsync();
+                instance.NumberPlateApiStatus = "Fetching...";
+                instance.NumberPlateApiColor = Brushes.Orange;
+                var success = await instance.NumberPlateService.FetchNumberPlatesAsync();
+                if (success)
+                {
+                    instance.NumberPlateApiStatus = "Success";
+                    instance.NumberPlateApiColor = Brushes.Green;
+                }
+                else
+                {
+                    instance.NumberPlateApiStatus = "Failed";
+                    instance.NumberPlateApiColor = Brushes.Red;
+                }
             }
         }
     }

@@ -41,7 +41,7 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
 
         // Set logging actions
         loggingService.LogAction = msg => ViewModel.LogText += msg;
-        loggingService.ScrollAction = () => { if (ViewModel.IsAutoScrollEnabled) LogScrollViewer.ScrollToEnd(); };
+        loggingService.ScrollAction = () => { if (ViewModel.IsAutoScrollEnabled) LogScrollViewer?.ScrollToEnd(); };
 
         DataContext = ViewModel;
 

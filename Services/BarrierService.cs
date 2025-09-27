@@ -16,7 +16,7 @@ namespace Ava.Services
             _loggingService = loggingService;
         }
 
-        public async Task SendPulseAsync(string apiUrl, string barrierName)
+        public async Task<bool> SendPulseAsync(string apiUrl, string barrierName)
         {
             try
             {
@@ -25,15 +25,18 @@ namespace Ava.Services
                 if (response.IsSuccessStatusCode)
                 {
                     _loggingService.Log($"Pulse sent successfully for {barrierName}");
+                    return true;
                 }
                 else
                 {
                     _loggingService.Log($"Pulse failed for {barrierName}: {response.StatusCode}");
+                    return false;
                 }
             }
             catch (Exception ex)
             {
                 _loggingService.Log($"Pulse error for {barrierName}: {ex.Message}");
+                return false;
             }
         }
     }

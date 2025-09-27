@@ -14,7 +14,7 @@ namespace Ava.ViewModels
     public class BarrierViewModel : ReactiveObject
     {
         private bool _isEnabled;
-        private IBrush _indicatorColor = Brushes.Gray;
+        private IBrush _indicatorColor = Brushes.Orange; // Amber for unknown
         private string _lastNumberPlate = "No data";
 
         public string Name { get; }
@@ -56,7 +56,8 @@ namespace Ava.ViewModels
             IBarrierService barrierService,
             ILoggingService loggingService,
             INumberPlateService numberPlateService,
-            ITransactionRepository transactionRepository)
+            ITransactionRepository transactionRepository,
+            DateTime startupTime)
         {
             Name = name;
             CronExpression = cronExpression;
@@ -66,6 +67,8 @@ namespace Ava.ViewModels
             _loggingService = loggingService;
             _numberPlateService = numberPlateService;
             _transactionRepository = transactionRepository;
+
+            LastProcessedDate = startupTime;
 
             SendPulseCommand = ReactiveCommand.CreateFromTask(() => SendPulseAsync(false));
         }
@@ -84,15 +87,20 @@ namespace Ava.ViewModels
                     LastProcessedDate = transaction.Created;
                     _loggingService.Log($"Processing transaction for {Name}: {LastNumberPlate}");
 
-                    // Check if In transaction and matches number plates or allow any
-                    if (transaction.Direction == 1 && (_numberPlateService.AllowAnyPlate || _numberPlateService.IsValidPlate(transaction.OcrPlate, transaction.Direction)))
+                    // For In (direction 1), check plate validity; for Out (0), always pulse
+                    if (transaction.Direction == 1)
                     {
-                        _loggingService.Log($"Transaction matches number plates, sending pulse for {Name}");
+                        if (!_numberPlateService.AllowAnyPlate && !_numberPlateService.IsValidPlate(transaction.OcrPlate, transaction.Direction))
+                        {
+                            var reason = _numberPlateService.GetValidationReason(transaction.OcrPlate, transaction.Direction);
+                            _loggingService.Log($"Invalid plate '{transaction.OcrPlate}' for In transaction on {Name}, skipping pulse. Reason: {reason ?? "Unknown validation error"}");
+                            return;
+                        }
+                        _loggingService.Log($"Valid In transaction for plate '{transaction.OcrPlate}', sending pulse for {Name}");
                     }
                     else
                     {
-                        _loggingService.Log($"Transaction does not match number plates or not In, skipping pulse for {Name}");
-                        return;
+                        _loggingService.Log($"Out transaction, sending pulse for {Name}");
                     }
                 }
                 else
@@ -108,21 +116,16 @@ namespace Ava.ViewModels
 
             _loggingService.Log($"Sending pulse for {Name}");
 
-            try
+            var success = await _barrierService.SendPulseAsync(ApiUrl, Name);
+            if (success)
             {
-                await _barrierService.SendPulseAsync(ApiUrl, Name);
-                IndicatorColor = Brushes.Green;
+                IndicatorColor = Brushes.Green; // Green for working
                 _loggingService.Log($"Pulse sent successfully for {Name}");
-                // Reset after some time
-                await Task.Delay(2000);
-                IndicatorColor = Brushes.Gray;
             }
-            catch (Exception ex)
+            else
             {
-                IndicatorColor = Brushes.Red;
-                _loggingService.Log($"Pulse error for {Name}: {ex.Message}");
-                await Task.Delay(2000);
-                IndicatorColor = Brushes.Gray;
+                IndicatorColor = Brushes.Red; // Red for error
+                _loggingService.Log($"Pulse failed for {Name}");
             }
         }
     }

@@ -8,7 +8,7 @@ namespace Ava.Repositories
     {
         void InitializeDatabase();
         void InsertSampleData();
-        Transaction GetNextTransaction(int laneId, DateTime lastProcessed);
+        Transaction? GetNextTransaction(int laneId, DateTime lastProcessed);
         List<Transaction> GetAllTransactions();
     }
 }

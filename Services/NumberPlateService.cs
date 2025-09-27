@@ -30,7 +30,7 @@ namespace Ava.Services
             _apiDownBehavior = apiDownBehavior;
         }
 
-        public async Task FetchNumberPlatesAsync()
+        public async Task<bool> FetchNumberPlatesAsync()
         {
             await _fetchSemaphore.WaitAsync();
             try
@@ -60,17 +60,20 @@ namespace Ava.Services
                         _loggingService.Log("Failed to deserialize number plates data.");
                     }
                     _allowAnyPlate = false;
+                    return true;
                 }
                 else
                 {
                     _loggingService.Log($"Failed to fetch number plates: {response.StatusCode}");
                     HandleApiDown();
+                    return false;
                 }
             }
             catch (Exception ex)
             {
                 _loggingService.Log($"Error fetching number plates: {ex.Message}");
                 HandleApiDown();
+                return false;
             }
             finally
             {
@@ -112,6 +115,31 @@ namespace Ava.Services
             if (_allowAnyPlate) return true;
 
             return _numberPlates.Any(p => p.Plate == plate && DateTime.Now >= p.Start && DateTime.Now <= p.Finish);
+        }
+
+        public string? GetValidationReason(string plate, int direction)
+        {
+            if (direction != 1) return null; // No validation for Out
+
+            if (_allowAnyPlate) return null;
+
+            var matchingPlate = _numberPlates.FirstOrDefault(p => p.Plate == plate);
+            if (matchingPlate == null)
+            {
+                return $"Plate '{plate}' not found in authorized list";
+            }
+
+            if (DateTime.Now < matchingPlate.Start)
+            {
+                return $"Plate '{plate}' not yet valid (starts {matchingPlate.Start:yyyy-MM-dd HH:mm})";
+            }
+
+            if (DateTime.Now > matchingPlate.Finish)
+            {
+                return $"Plate '{plate}' expired (ended {matchingPlate.Finish:yyyy-MM-dd HH:mm})";
+            }
+
+            return null; // Should not reach here if IsValidPlate is false
         }
     }
 }
