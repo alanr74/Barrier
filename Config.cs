@@ -8,6 +8,7 @@ namespace Ava
         public string CronExpression { get; set; } = string.Empty;
         public string ApiUrl { get; set; } = string.Empty;
         public int LaneId { get; set; }
+        public string ApiDownBehavior { get; set; } = "UseHistoric";
     }
 
     public class BarriersConfig
@@ -21,6 +22,5 @@ namespace Ava
         public BarriersConfig Barriers { get; set; } = new();
         public string NumberPlatesApiUrl { get; set; } = string.Empty;
         public string NumberPlatesCronExpression { get; set; } = "0 0 * * * ?";
-        public string ApiDownBehavior { get; set; } = "UseHistoric";
     }
 }

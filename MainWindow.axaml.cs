@@ -29,7 +29,7 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
         var transactionRepository = new TransactionRepository();
         var loggingService = new LoggingService();
         var barrierService = new BarrierService(httpClient, loggingService);
-        var numberPlateService = new NumberPlateService(httpClient, loggingService, appConfig.NumberPlatesApiUrl, appConfig.ApiDownBehavior);
+        var numberPlateService = new NumberPlateService(httpClient, loggingService, appConfig.NumberPlatesApiUrl);
         var schedulingService = new SchedulingService();
 
         ViewModel = new Ava.ViewModels.MainWindowViewModel(
@@ -41,7 +41,7 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
 
         // Set logging actions
         loggingService.LogAction = msg => ViewModel.LogText += msg;
-        loggingService.ScrollAction = () => { if (ViewModel.IsAutoScrollEnabled) LogScrollViewer?.ScrollToEnd(); };
+        loggingService.ScrollAction = () => { if (ViewModel.IsAutoScrollEnabled) LogScrollViewer!.ScrollToEnd(); };
 
         DataContext = ViewModel;
 

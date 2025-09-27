@@ -5,12 +5,13 @@
 - Migrated from .NET 9 preview to .NET 8 for stability
 - Removed unit tests project to simplify the codebase
 - Enhanced logging for invalid plate validation with specific reasons (not found, expired, not yet valid)
+- Made ApiDownBehavior configurable per barrier
 
 A C# Avalonia-based desktop application for managing automated barrier controls with number plate validation and scheduling.
 
 ## Overview
 
-This application controls multiple barriers that open/close based on vehicle transactions. It integrates with external APIs for number plate data and uses scheduled jobs to automate barrier operations. The system supports different fallback behaviors when the number plate API is unavailable.
+This application controls multiple barriers that open/close based on vehicle transactions. It integrates with external APIs for number plate data and uses scheduled jobs to automate barrier operations. The system supports different fallback behaviors when the number plate API is unavailable, now configurable per barrier.
 
 ## Features
 
@@ -18,7 +19,7 @@ This application controls multiple barriers that open/close based on vehicle tra
 - **Automated Scheduling**: Cron-based jobs for barrier operations and data fetching
 - **Number Plate Validation**: Check incoming vehicles against authorized number plates with date/time ranges
 - **API Integration**: Fetch number plate data from external APIs
-- **Fallback Modes**: Configurable behavior when APIs are down
+- **Fallback Modes**: Configurable behavior when APIs are down (per barrier)
 - **Real-time Monitoring**: Live logging and status indicators
 - **Manual Controls**: UI buttons for manual operations
 
@@ -119,21 +120,35 @@ Services are manually injected in `MainWindow.xaml.cs`. In production, use a DI 
       "Barrier1": {
         "CronExpression": "*/5 * * * * ?",
         "ApiUrl": "http://192.168.1.2/status.xml?pl1=1",
-        "LaneId": 1
+        "LaneId": 1,
+        "ApiDownBehavior": "UseHistoric"
+      },
+      "Barrier2": {
+        "CronExpression": "*/7 * * * * ?",
+        "ApiUrl": "http://192.168.1.2/status.xml?pl2=1",
+        "LaneId": 2,
+        "ApiDownBehavior": "DontOpen"
+      },
+      "Barrier3": {
+        "CronExpression": "*/5 * * * * ?",
+        "ApiUrl": "http://192.168.1.2/status.xml?pl2=1",
+        "LaneId": 3,
+        "ApiDownBehavior": "OpenAny"
       }
     }
   },
   "NumberPlatesApiUrl": "https://api.example.com/numberplates",
-  "NumberPlatesCronExpression": "0 0 * * * ?",
-  "ApiDownBehavior": "UseHistoric"
+  "NumberPlatesCronExpression": "0 0 * * * ?"
 }
 ```
 
-### API Down Behaviors
+### API Down Behaviors (Per Barrier)
 
 - **UseHistoric**: Continue using previously fetched number plate data
 - **DontOpen**: Clear number plate data, don't open barriers for any vehicles
 - **OpenAny**: Allow all vehicles to pass (bypass validation)
+
+Each barrier can have its own ApiDownBehavior configured independently.
 
 ## Operation Flow
 
@@ -144,7 +159,7 @@ Services are manually injected in `MainWindow.xaml.cs`. In production, use a DI 
 3. **Transaction Processing**:
    - Fetch next unprocessed transaction for the barrier's lane
    - Check if transaction is "In" direction (Direction = 1)
-   - Validate number plate against authorized list and date/time range
+   - Validate number plate against authorized list and date/time range using the barrier's ApiDownBehavior
    - Send pulse to barrier hardware if valid
 
 ### Manual Mode
@@ -162,21 +177,26 @@ graph TD
     C -->|Yes| E[Update Last Processed Date]
     E --> F{Is Direction 'In' (1)?}
     F -->|No (Out)| G[Log: Out transaction, send pulse]
-    F -->|Yes| H[Is AllowAnyPlate?]
-    H -->|Yes| G
-    H -->|No| I[Validate Plate: IsValidPlate?]
-    I -->|Yes| G
-    I -->|No| J[Get Validation Reason]
-    J --> K[Log: Invalid plate with reason, skip pulse]
-    G --> L[Send Pulse to Barrier API]
-    L --> M{Success?}
-    M -->|Yes| N[Log: Pulse sent successfully<br/>Set Indicator Green]
-    M -->|No| O[Log: Pulse failed<br/>Set Indicator Red]
-    N --> P[Mark Transaction as Sent]
-    O --> P
-    P --> Q[End Job]
-    D --> Q
-    K --> Q
+    F -->|Yes| H[Get Barrier's ApiDownBehavior]
+    H --> I{ApiDownBehavior?}
+    I -->|OpenAny| G
+    I -->|DontOpen| J[Log: DontOpen mode, skip pulse]
+    I -->|UseHistoric| K[Is AllowAnyPlate?]
+    K -->|Yes| G
+    K -->|No| L[Validate Plate: IsValidPlate?]
+    L -->|Yes| G
+    L -->|No| M[Get Validation Reason]
+    M --> N[Log: Invalid plate with reason, skip pulse]
+    G --> O[Send Pulse to Barrier API]
+    O --> P{Success?}
+    P -->|Yes| Q[Log: Pulse sent successfully<br/>Set Indicator Green]
+    P -->|No| R[Log: Pulse failed<br/>Set Indicator Red]
+    Q --> S[Mark Transaction as Sent]
+    R --> S
+    S --> T[End Job]
+    D --> T
+    J --> T
+    N --> T
 ```
 
 ## Database Schema
@@ -279,7 +299,7 @@ All operations are logged to the UI console with timestamps:
 
 ## Error Handling
 
-- API failures with configurable fallback modes
+- API failures with configurable fallback modes (per barrier)
 - Database connection issues
 - Invalid configurations
 - Network timeouts

@@ -108,9 +108,9 @@ namespace Ava.ViewModels
                 var barrierKey = $"Barrier{i}";
                 if (appConfig.Barriers.Barriers.TryGetValue(barrierKey, out var barrierConfig))
                 {
-                    var barrierVm = new BarrierViewModel(barrierKey, barrierConfig.CronExpression, barrierConfig.ApiUrl, barrierConfig.LaneId, BarrierService, LoggingService, NumberPlateService, TransactionRepository, AppStartupTime);
+                    var barrierVm = new BarrierViewModel(barrierKey, barrierConfig.CronExpression, barrierConfig.ApiUrl, barrierConfig.LaneId, barrierConfig.ApiDownBehavior, BarrierService, LoggingService, NumberPlateService, TransactionRepository, AppStartupTime);
                     Barriers.Add(barrierVm);
-                    LoggingService.Log($"Added barrier {barrierKey} with LaneId {barrierConfig.LaneId}");
+                    LoggingService.Log($"Added barrier {barrierKey} with LaneId {barrierConfig.LaneId}, ApiDownBehavior {barrierConfig.ApiDownBehavior}");
                 }
                 else
                 {

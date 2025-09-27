@@ -21,6 +21,7 @@ namespace Ava.ViewModels
         public string CronExpression { get; }
         public string ApiUrl { get; }
         public int LaneId { get; }
+        public string ApiDownBehavior { get; }
         public DateTime LastProcessedDate { get; set; } = DateTime.MinValue;
 
         private readonly IBarrierService _barrierService;
@@ -53,6 +54,7 @@ namespace Ava.ViewModels
             string cronExpression,
             string apiUrl,
             int laneId,
+            string apiDownBehavior,
             IBarrierService barrierService,
             ILoggingService loggingService,
             INumberPlateService numberPlateService,
@@ -63,6 +65,7 @@ namespace Ava.ViewModels
             CronExpression = cronExpression;
             ApiUrl = apiUrl;
             LaneId = laneId;
+            ApiDownBehavior = apiDownBehavior;
             _barrierService = barrierService;
             _loggingService = loggingService;
             _numberPlateService = numberPlateService;
@@ -90,9 +93,9 @@ namespace Ava.ViewModels
                     // For In (direction 1), check plate validity; for Out (0), always pulse
                     if (transaction.Direction == 1)
                     {
-                        if (!_numberPlateService.AllowAnyPlate && !_numberPlateService.IsValidPlate(transaction.OcrPlate, transaction.Direction))
+                        if (!_numberPlateService.IsValidPlate(transaction.OcrPlate, transaction.Direction, ApiDownBehavior))
                         {
-                            var reason = _numberPlateService.GetValidationReason(transaction.OcrPlate, transaction.Direction);
+                            var reason = _numberPlateService.GetValidationReason(transaction.OcrPlate, transaction.Direction, ApiDownBehavior);
                             _loggingService.Log($"Invalid plate '{transaction.OcrPlate}' for In transaction on {Name}, skipping pulse. Reason: {reason ?? "Unknown validation error"}");
                             return;
                         }
@@ -111,21 +114,18 @@ namespace Ava.ViewModels
             }
             else
             {
-                _loggingService.Log($"Manual pulse for {Name}");
             }
-
-            _loggingService.Log($"Sending pulse for {Name}");
 
             var success = await _barrierService.SendPulseAsync(ApiUrl, Name);
             if (success)
             {
                 IndicatorColor = Brushes.Green; // Green for working
-                _loggingService.Log($"Pulse sent successfully for {Name}");
+                _loggingService.Log($"Manual pulse sent successfully for {Name}");
             }
             else
             {
                 IndicatorColor = Brushes.Red; // Red for error
-                _loggingService.Log($"Pulse failed for {Name}");
+                _loggingService.Log($"Manual pulse failed for {Name}");
             }
         }
     }

@@ -14,7 +14,6 @@ namespace Ava.Services
         private readonly HttpClient _httpClient;
         private readonly ILoggingService _loggingService;
         private readonly string _apiUrl;
-        private readonly string _apiDownBehavior;
         private readonly SemaphoreSlim _fetchSemaphore = new SemaphoreSlim(1, 1);
 
         private List<NumberPlateEntry> _numberPlates = new();
@@ -22,12 +21,11 @@ namespace Ava.Services
 
         public bool AllowAnyPlate => _allowAnyPlate;
 
-        public NumberPlateService(HttpClient httpClient, ILoggingService loggingService, string apiUrl, string apiDownBehavior)
+        public NumberPlateService(HttpClient httpClient, ILoggingService loggingService, string apiUrl)
         {
             _httpClient = httpClient;
             _loggingService = loggingService;
             _apiUrl = apiUrl;
-            _apiDownBehavior = apiDownBehavior;
         }
 
         public async Task<bool> FetchNumberPlatesAsync()
@@ -83,63 +81,84 @@ namespace Ava.Services
 
         private void HandleApiDown()
         {
-            switch (_apiDownBehavior)
-            {
-                case "UseHistoric":
-                    // Keep existing data
-                    _allowAnyPlate = false;
-                    _loggingService.Log("API down, using historic data.");
-                    break;
-                case "DontOpen":
-                    _numberPlates.Clear();
-                    _allowAnyPlate = false;
-                    _loggingService.Log("API down, DontOpen mode: cleared number plates.");
-                    break;
-                case "OpenAny":
-                    _allowAnyPlate = true;
-                    _loggingService.Log("API down, OpenAny mode: allowing any plate.");
-                    break;
-                default:
-                    // Default to UseHistoric
-                    _allowAnyPlate = false;
-                    _loggingService.Log("API down, defaulting to use historic data.");
-                    break;
-            }
+            // Global fallback for when API is down, but per-barrier behavior overrides in validation
+            _allowAnyPlate = false;
+            _loggingService.Log("API down, using historic data globally (per-barrier behavior applies in validation).");
         }
 
-        public bool IsValidPlate(string plate, int direction)
+        public bool IsValidPlate(string plate, int direction, string apiDownBehavior)
         {
             // Only check for In direction (1)
             if (direction != 1) return true; // Allow Out direction always
 
-            if (_allowAnyPlate) return true;
-
-            return _numberPlates.Any(p => p.Plate == plate && DateTime.Now >= p.Start && DateTime.Now <= p.Finish);
+            switch (apiDownBehavior)
+            {
+                case "OpenAny":
+                    return true;
+                case "DontOpen":
+                    return false;
+                case "UseHistoric":
+                    if (_allowAnyPlate) return true;
+                    return _numberPlates.Any(p => p.Plate == plate && DateTime.Now >= p.Start && DateTime.Now <= p.Finish);
+                default:
+                    // Default to UseHistoric
+                    if (_allowAnyPlate) return true;
+                    return _numberPlates.Any(p => p.Plate == plate && DateTime.Now >= p.Start && DateTime.Now <= p.Finish);
+            }
         }
 
-        public string? GetValidationReason(string plate, int direction)
+        public string? GetValidationReason(string plate, int direction, string apiDownBehavior)
         {
             if (direction != 1) return null; // No validation for Out
 
-            if (_allowAnyPlate) return null;
-
-            var matchingPlate = _numberPlates.FirstOrDefault(p => p.Plate == plate);
-            if (matchingPlate == null)
+            switch (apiDownBehavior)
             {
-                return $"Plate '{plate}' not found in authorized list";
-            }
+                case "OpenAny":
+                    return null;
+                case "DontOpen":
+                    return "API down, DontOpen mode: barrier not opened";
+                case "UseHistoric":
+                    if (_allowAnyPlate) return null;
 
-            if (DateTime.Now < matchingPlate.Start)
-            {
-                return $"Plate '{plate}' not yet valid (starts {matchingPlate.Start:yyyy-MM-dd HH:mm})";
-            }
+                    var matchingPlate = _numberPlates.FirstOrDefault(p => p.Plate == plate);
+                    if (matchingPlate == null)
+                    {
+                        return $"Plate '{plate}' not found in authorized list";
+                    }
 
-            if (DateTime.Now > matchingPlate.Finish)
-            {
-                return $"Plate '{plate}' expired (ended {matchingPlate.Finish:yyyy-MM-dd HH:mm})";
-            }
+                    if (DateTime.Now < matchingPlate.Start)
+                    {
+                        return $"Plate '{plate}' not yet valid (starts {matchingPlate.Start:yyyy-MM-dd HH:mm})";
+                    }
 
-            return null; // Should not reach here if IsValidPlate is false
+                    if (DateTime.Now > matchingPlate.Finish)
+                    {
+                        return $"Plate '{plate}' expired (ended {matchingPlate.Finish:yyyy-MM-dd HH:mm})";
+                    }
+
+                    return null; // Should not reach here if IsValidPlate is false
+                default:
+                    // Default to UseHistoric
+                    if (_allowAnyPlate) return null;
+
+                    var matchingPlateDefault = _numberPlates.FirstOrDefault(p => p.Plate == plate);
+                    if (matchingPlateDefault == null)
+                    {
+                        return $"Plate '{plate}' not found in authorized list";
+                    }
+
+                    if (DateTime.Now < matchingPlateDefault.Start)
+                    {
+                        return $"Plate '{plate}' not yet valid (starts {matchingPlateDefault.Start:yyyy-MM-dd HH:mm})";
+                    }
+
+                    if (DateTime.Now > matchingPlateDefault.Finish)
+                    {
+                        return $"Plate '{plate}' expired (ended {matchingPlateDefault.Finish:yyyy-MM-dd HH:mm})";
+                    }
+
+                    return null;
+            }
         }
     }
 }

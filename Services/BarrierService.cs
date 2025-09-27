@@ -20,18 +20,8 @@ namespace Ava.Services
         {
             try
             {
-                _loggingService.Log($"Sending pulse for {barrierName}");
                 var response = await _httpClient.PostAsync(apiUrl, null);
-                if (response.IsSuccessStatusCode)
-                {
-                    _loggingService.Log($"Pulse sent successfully for {barrierName}");
-                    return true;
-                }
-                else
-                {
-                    _loggingService.Log($"Pulse failed for {barrierName}: {response.StatusCode}");
-                    return false;
-                }
+                return response.IsSuccessStatusCode;
             }
             catch (Exception ex)
             {
