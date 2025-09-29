@@ -110,6 +110,7 @@ namespace Ava.ViewModels
                 {
                     var barrierVm = new BarrierViewModel(barrierKey, barrierConfig.CronExpression, barrierConfig.ApiUrl, barrierConfig.LaneId, barrierConfig.ApiDownBehavior, BarrierService, LoggingService, NumberPlateService, TransactionRepository, AppStartupTime);
                     Barriers.Add(barrierVm);
+                    _ = barrierVm.UpdateApiStatusAsync(); // Initial status check
                     LoggingService.Log($"Added barrier {barrierKey} with LaneId {barrierConfig.LaneId}, ApiDownBehavior {barrierConfig.ApiDownBehavior}");
                 }
                 else

@@ -29,5 +29,27 @@ namespace Ava.Services
                 return false;
             }
         }
+
+        public async Task<ApiStatus> CheckApiStatusAsync(string apiUrl, string barrierName)
+        {
+            try
+            {
+                var response = await _httpClient.GetAsync(apiUrl);
+                if (response.IsSuccessStatusCode)
+                {
+                    return ApiStatus.Up;
+                }
+                else
+                {
+                    _loggingService.Log($"API status check failed for {barrierName}: {response.StatusCode}");
+                    return ApiStatus.Down;
+                }
+            }
+            catch (Exception ex)
+            {
+                _loggingService.Log($"API status check error for {barrierName}: {ex.Message}");
+                return ApiStatus.Down;
+            }
+        }
     }
 }

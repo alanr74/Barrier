@@ -14,6 +14,7 @@ namespace Ava.Services
         private readonly HttpClient _httpClient;
         private readonly ILoggingService _loggingService;
         private readonly string _apiUrl;
+        private readonly List<string> _whitelistIds;
         private readonly SemaphoreSlim _fetchSemaphore = new SemaphoreSlim(1, 1);
 
         private List<NumberPlateEntry> _numberPlates = new();
@@ -21,11 +22,12 @@ namespace Ava.Services
 
         public bool AllowAnyPlate => _allowAnyPlate;
 
-        public NumberPlateService(HttpClient httpClient, ILoggingService loggingService, string apiUrl)
+        public NumberPlateService(HttpClient httpClient, ILoggingService loggingService, string apiUrl, List<string> whitelistIds)
         {
             _httpClient = httpClient;
             _loggingService = loggingService;
             _apiUrl = apiUrl;
+            _whitelistIds = whitelistIds;
         }
 
         public async Task<bool> FetchNumberPlatesAsync()
@@ -34,7 +36,8 @@ namespace Ava.Services
             try
             {
                 _loggingService.Log("Fetching number plates from API...");
-                var response = await _httpClient.GetAsync(_apiUrl);
+                var url = $"{_apiUrl}?whitelistId={string.Join(",", _whitelistIds)}";
+                var response = await _httpClient.GetAsync(url);
                 if (response.IsSuccessStatusCode)
                 {
                     var json = await response.Content.ReadAsStringAsync();

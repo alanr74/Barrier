@@ -22,5 +22,6 @@ namespace Ava
         public BarriersConfig Barriers { get; set; } = new();
         public string NumberPlatesApiUrl { get; set; } = string.Empty;
         public string NumberPlatesCronExpression { get; set; } = "0 0 * * * ?";
+        public List<string> WhitelistIds { get; set; } = new();
     }
 }

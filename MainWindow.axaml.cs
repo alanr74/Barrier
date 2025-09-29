@@ -29,7 +29,7 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
         var transactionRepository = new TransactionRepository();
         var loggingService = new LoggingService();
         var barrierService = new BarrierService(httpClient, loggingService);
-        var numberPlateService = new NumberPlateService(httpClient, loggingService, appConfig.NumberPlatesApiUrl);
+        var numberPlateService = new NumberPlateService(httpClient, loggingService, appConfig.NumberPlatesApiUrl, appConfig.WhitelistIds!);
         var schedulingService = new SchedulingService();
 
         ViewModel = new Ava.ViewModels.MainWindowViewModel(

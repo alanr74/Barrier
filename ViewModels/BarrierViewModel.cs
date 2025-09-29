@@ -41,6 +41,14 @@ namespace Ava.ViewModels
             set => this.RaiseAndSetIfChanged(ref _indicatorColor, value);
         }
 
+        private IBrush _apiStatusColor = Brushes.Orange; // Amber for unknown
+
+        public IBrush ApiStatusColor
+        {
+            get => _apiStatusColor;
+            set => this.RaiseAndSetIfChanged(ref _apiStatusColor, value);
+        }
+
         public string LastNumberPlate
         {
             get => _lastNumberPlate;
@@ -74,6 +82,24 @@ namespace Ava.ViewModels
             LastProcessedDate = startupTime;
 
             SendPulseCommand = ReactiveCommand.CreateFromTask(() => SendPulseAsync(false));
+            _ = UpdateApiStatusAsync(); // Initial status check
+        }
+
+        public async Task UpdateApiStatusAsync()
+        {
+            var status = await _barrierService.CheckApiStatusAsync(ApiUrl, Name);
+            switch (status)
+            {
+                case ApiStatus.Up:
+                    ApiStatusColor = Brushes.Green;
+                    break;
+                case ApiStatus.Down:
+                    ApiStatusColor = Brushes.Red;
+                    break;
+                case ApiStatus.Unknown:
+                    ApiStatusColor = Brushes.Orange;
+                    break;
+            }
         }
 
         public async Task SendPulseAsync(bool isCron = false)
@@ -127,6 +153,9 @@ namespace Ava.ViewModels
                 IndicatorColor = Brushes.Red; // Red for error
                 _loggingService.Log($"Manual pulse failed for {Name}");
             }
+
+            // Update API status after pulse
+            await UpdateApiStatusAsync();
         }
     }
 }
