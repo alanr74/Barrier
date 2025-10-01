@@ -149,12 +149,14 @@ namespace Ava.ViewModels
             if (success)
             {
                 IndicatorColor = Brushes.Green; // Green for working
-                _loggingService.Log($"Manual pulse sent successfully for {Name}");
+                var pulseType = isCron ? "Cron" : "Manual";
+                _loggingService.Log($"{pulseType} pulse sent successfully for {Name}");
             }
             else
             {
                 IndicatorColor = Brushes.Red; // Red for error
-                _loggingService.Log($"Manual pulse failed for {Name}");
+                var pulseType = isCron ? "Cron" : "Manual";
+                _loggingService.Log($"{pulseType} pulse failed for {Name}");
             }
 
             // Update API status after pulse
