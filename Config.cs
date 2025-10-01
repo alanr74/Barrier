@@ -24,6 +24,7 @@ namespace Ava
         public string NumberPlatesCronExpression { get; set; } = "0 0 * * * ?";
         public List<string> WhitelistIds { get; set; } = new();
         public bool SendInitialPulse { get; set; } = true;
+        public bool SkipInitialCronPulse { get; set; } = false;
         public bool PerformInitialApiStatusCheck { get; set; } = true;
     }
 }

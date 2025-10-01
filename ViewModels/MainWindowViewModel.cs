@@ -28,6 +28,7 @@ namespace Ava.ViewModels
             public ILoggingService LoggingService { get; }
 
             private bool _sendInitialPulse;
+            private bool _skipInitialCronPulse;
 
             public static DateTime AppStartupTime { get; private set; }
 
@@ -53,6 +54,12 @@ namespace Ava.ViewModels
             {
                 get => _numberPlateApiColor;
                 set => this.RaiseAndSetIfChanged(ref _numberPlateApiColor, value);
+            }
+
+            public bool SkipInitialCronPulse
+            {
+                get => _skipInitialCronPulse;
+                set => this.RaiseAndSetIfChanged(ref _skipInitialCronPulse, value);
             }
 
         public ReactiveCommand<System.Reactive.Unit, System.Reactive.Unit> FetchNumberPlatesCommand { get; }
@@ -104,6 +111,7 @@ namespace Ava.ViewModels
                 var appConfig = config.Get<AppConfig>() ?? new AppConfig();
                 _sendInitialPulse = appConfig.SendInitialPulse;
                 var performInitialApiStatusCheck = appConfig.PerformInitialApiStatusCheck;
+                _skipInitialCronPulse = appConfig.SkipInitialCronPulse;
 
                 Console.WriteLine($"Loaded SendInitialPulse: {appConfig.SendInitialPulse}");
 

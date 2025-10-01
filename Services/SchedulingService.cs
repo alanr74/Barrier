@@ -73,17 +73,21 @@ namespace Ava.Services
         {
             var barrierName = context.JobDetail.JobDataMap.GetString("BarrierName");
             var instance = MainWindowViewModel.Instance;
-            if (instance != null && DateTime.Now - MainWindowViewModel.AppStartupTime > TimeSpan.FromSeconds(30))
+            if (instance != null)
             {
-                var barrier = instance.Barriers.FirstOrDefault(b => b.Name == barrierName);
-                if (barrier != null && barrier.IsEnabled)
+                var delaySeconds = instance.SkipInitialCronPulse ? 1 : 30;
+                if (DateTime.Now - MainWindowViewModel.AppStartupTime > TimeSpan.FromSeconds(delaySeconds))
                 {
-                    await barrier.SendPulseAsync(true);
+                    var barrier = instance.Barriers.FirstOrDefault(b => b.Name == barrierName);
+                    if (barrier != null && barrier.IsEnabled)
+                    {
+                        await barrier.SendPulseAsync(true);
+                    }
                 }
-            }
-            else
-            {
-                instance?.LoggingService.Log($"Skipping initial cron pulse for {barrierName} (startup delay)");
+                else
+                {
+                    instance?.LoggingService.Log($"Skipping initial cron pulse for {barrierName} (startup delay of {delaySeconds} seconds)");
+                }
             }
         }
     }
