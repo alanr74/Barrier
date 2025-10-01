@@ -27,6 +27,8 @@ namespace Ava.ViewModels
             public ISchedulingService SchedulingService { get; }
             public ILoggingService LoggingService { get; }
 
+            private bool _sendInitialPulse;
+
             public static DateTime AppStartupTime { get; private set; }
 
             public string LogText
@@ -99,9 +101,13 @@ namespace Ava.ViewModels
                 .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true)
                 .Build();
 
-            var appConfig = config.Get<AppConfig>() ?? new AppConfig();
+                var appConfig = config.Get<AppConfig>() ?? new AppConfig();
+                _sendInitialPulse = appConfig.SendInitialPulse;
+                var performInitialApiStatusCheck = appConfig.PerformInitialApiStatusCheck;
 
-            LoggingService.Log($"Config loaded, Count: {appConfig.Barriers.Count}, Barriers dict count: {appConfig.Barriers.Barriers.Count}");
+                Console.WriteLine($"Loaded SendInitialPulse: {appConfig.SendInitialPulse}");
+
+                LoggingService.Log($"Config loaded, Count: {appConfig.Barriers.Count}, Barriers dict count: {appConfig.Barriers.Barriers.Count}");
 
             for (int i = 1; i <= appConfig.Barriers.Count; i++)
             {
@@ -110,7 +116,10 @@ namespace Ava.ViewModels
                 {
                     var barrierVm = new BarrierViewModel(barrierKey, barrierConfig.CronExpression, barrierConfig.ApiUrl, barrierConfig.LaneId, barrierConfig.ApiDownBehavior, BarrierService, LoggingService, NumberPlateService, TransactionRepository, AppStartupTime);
                     Barriers.Add(barrierVm);
-                    _ = barrierVm.UpdateApiStatusAsync(); // Initial status check
+                    if (performInitialApiStatusCheck)
+                    {
+                        _ = barrierVm.UpdateApiStatusAsync(); // Initial status check
+                    }
                     LoggingService.Log($"Added barrier {barrierKey} with LaneId {barrierConfig.LaneId}, ApiDownBehavior {barrierConfig.ApiDownBehavior}");
                 }
                 else
@@ -130,6 +139,26 @@ namespace Ava.ViewModels
             TransactionRepository.InitializeDatabase();
             TransactionRepository.InsertSampleData();
             await SchedulingService.StartAsync();
+
+            Console.WriteLine($"SendInitialPulse config: {_sendInitialPulse}");
+
+            LoggingService.Log($"SendInitialPulse config: {_sendInitialPulse}");
+
+            if (_sendInitialPulse)
+            {
+                foreach (var barrier in Barriers)
+                {
+                    try
+                    {
+                        var success = await barrier.SendPulseAsync(false);
+                        LoggingService.Log(success ? $"Initial pulse sent successfully for {barrier.Name}" : $"Initial pulse failed for {barrier.Name}");
+                    }
+                    catch (Exception ex)
+                    {
+                        LoggingService.Log($"Initial pulse error for {barrier.Name}: {ex.Message}");
+                    }
+                }
+            }
         }
 
         public void Log(string message)

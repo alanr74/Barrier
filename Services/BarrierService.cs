@@ -18,9 +18,18 @@ namespace Ava.Services
 
         public async Task<bool> SendPulseAsync(string apiUrl, string barrierName)
         {
+            _loggingService.Log($"Sending pulse to {apiUrl} for {barrierName}");
             try
             {
                 var response = await _httpClient.PostAsync(apiUrl, null);
+                if (response.IsSuccessStatusCode)
+                {
+                    _loggingService.Log($"Pulse sent successfully for {barrierName}");
+                }
+                else
+                {
+                    _loggingService.Log($"Pulse failed for {barrierName}: {response.StatusCode}");
+                }
                 return response.IsSuccessStatusCode;
             }
             catch (Exception ex)

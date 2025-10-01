@@ -82,7 +82,6 @@ namespace Ava.ViewModels
             LastProcessedDate = startupTime;
 
             SendPulseCommand = ReactiveCommand.CreateFromTask(() => SendPulseAsync(false));
-            _ = UpdateApiStatusAsync(); // Initial status check
         }
 
         public async Task UpdateApiStatusAsync()
@@ -102,9 +101,11 @@ namespace Ava.ViewModels
             }
         }
 
-        public async Task SendPulseAsync(bool isCron = false)
+        public async Task<bool> SendPulseAsync(bool isCron = false)
         {
-            if (isCron && !IsEnabled) return;
+            Console.WriteLine($"SendPulseAsync called for {Name}, isCron: {isCron} at {DateTime.Now}");
+
+            if (isCron && !IsEnabled) return false;
 
             // For cron, get next transaction; for manual, don't read db
             if (isCron)
@@ -123,7 +124,7 @@ namespace Ava.ViewModels
                         {
                             var reason = _numberPlateService.GetValidationReason(transaction.OcrPlate, transaction.Direction, ApiDownBehavior);
                             _loggingService.Log($"Invalid plate '{transaction.OcrPlate}' for In transaction on {Name}, skipping pulse. Reason: {reason ?? "Unknown validation error"}");
-                            return;
+                            return false;
                         }
                         _loggingService.Log($"Valid In transaction for plate '{transaction.OcrPlate}', sending pulse for {Name}");
                     }
@@ -135,7 +136,7 @@ namespace Ava.ViewModels
                 else
                 {
                     _loggingService.Log($"No pending transactions for {Name}, skipping cron pulse");
-                    return;
+                    return false;
                 }
             }
             else
@@ -156,6 +157,8 @@ namespace Ava.ViewModels
 
             // Update API status after pulse
             await UpdateApiStatusAsync();
+
+            return success;
         }
     }
 }

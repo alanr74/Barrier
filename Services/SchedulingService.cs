@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -71,15 +72,18 @@ namespace Ava.Services
         public async Task Execute(IJobExecutionContext context)
         {
             var barrierName = context.JobDetail.JobDataMap.GetString("BarrierName");
-            // Note: This assumes MainWindowViewModel.Instance is accessible
             var instance = MainWindowViewModel.Instance;
-            if (instance != null)
+            if (instance != null && DateTime.Now - MainWindowViewModel.AppStartupTime > TimeSpan.FromSeconds(30))
             {
                 var barrier = instance.Barriers.FirstOrDefault(b => b.Name == barrierName);
                 if (barrier != null && barrier.IsEnabled)
                 {
                     await barrier.SendPulseAsync(true);
                 }
+            }
+            else
+            {
+                instance?.LoggingService.Log($"Skipping initial cron pulse for {barrierName} (startup delay)");
             }
         }
     }

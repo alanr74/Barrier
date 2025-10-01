@@ -23,5 +23,7 @@ namespace Ava
         public string NumberPlatesApiUrl { get; set; } = string.Empty;
         public string NumberPlatesCronExpression { get; set; } = "0 0 * * * ?";
         public List<string> WhitelistIds { get; set; } = new();
+        public bool SendInitialPulse { get; set; } = true;
+        public bool PerformInitialApiStatusCheck { get; set; } = true;
     }
 }
