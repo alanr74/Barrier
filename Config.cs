@@ -3,13 +3,14 @@ using System.Collections.Generic;
 
 namespace Ava
 {
-    public class BarrierConfig
-    {
-        public string CronExpression { get; set; } = string.Empty;
-        public string ApiUrl { get; set; } = string.Empty;
-        public int LaneId { get; set; }
-        public string ApiDownBehavior { get; set; } = "UseHistoric";
-    }
+        public class BarrierConfig
+        {
+            public string CronExpression { get; set; } = string.Empty;
+            public string ApiUrl { get; set; } = string.Empty;
+            public int LaneId { get; set; }
+            public string ApiDownBehavior { get; set; } = "UseHistoric";
+            public bool IsEnabled { get; set; } = true;
+        }
 
     public class BarriersConfig
     {
@@ -26,5 +27,6 @@ namespace Ava
         public bool SendInitialPulse { get; set; } = true;
         public bool SkipInitialCronPulse { get; set; } = false;
         public bool PerformInitialApiStatusCheck { get; set; } = true;
+        public bool AutostartNumberPlates { get; set; } = true;
     }
 }

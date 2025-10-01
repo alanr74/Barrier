@@ -63,6 +63,7 @@ namespace Ava.ViewModels
             string apiUrl,
             int laneId,
             string apiDownBehavior,
+            bool initialEnabled,
             IBarrierService barrierService,
             ILoggingService loggingService,
             INumberPlateService numberPlateService,
@@ -74,6 +75,7 @@ namespace Ava.ViewModels
             ApiUrl = apiUrl;
             LaneId = laneId;
             ApiDownBehavior = apiDownBehavior;
+            IsEnabled = initialEnabled;
             _barrierService = barrierService;
             _loggingService = loggingService;
             _numberPlateService = numberPlateService;

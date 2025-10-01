@@ -29,6 +29,7 @@ namespace Ava.ViewModels
 
             private bool _sendInitialPulse;
             private bool _skipInitialCronPulse;
+            private bool _autostartNumberPlates;
 
             public static DateTime AppStartupTime { get; private set; }
 
@@ -112,6 +113,7 @@ namespace Ava.ViewModels
                 _sendInitialPulse = appConfig.SendInitialPulse;
                 var performInitialApiStatusCheck = appConfig.PerformInitialApiStatusCheck;
                 _skipInitialCronPulse = appConfig.SkipInitialCronPulse;
+                _autostartNumberPlates = appConfig.AutostartNumberPlates;
 
                 Console.WriteLine($"Loaded SendInitialPulse: {appConfig.SendInitialPulse}");
 
@@ -122,7 +124,7 @@ namespace Ava.ViewModels
                 var barrierKey = $"Barrier{i}";
                 if (appConfig.Barriers.Barriers.TryGetValue(barrierKey, out var barrierConfig))
                 {
-                    var barrierVm = new BarrierViewModel(barrierKey, barrierConfig.CronExpression, barrierConfig.ApiUrl, barrierConfig.LaneId, barrierConfig.ApiDownBehavior, BarrierService, LoggingService, NumberPlateService, TransactionRepository, AppStartupTime);
+                    var barrierVm = new BarrierViewModel(barrierKey, barrierConfig.CronExpression, barrierConfig.ApiUrl, barrierConfig.LaneId, barrierConfig.ApiDownBehavior, barrierConfig.IsEnabled, BarrierService, LoggingService, NumberPlateService, TransactionRepository, AppStartupTime);
                     Barriers.Add(barrierVm);
                     if (performInitialApiStatusCheck)
                     {
@@ -147,6 +149,13 @@ namespace Ava.ViewModels
             TransactionRepository.InitializeDatabase();
             TransactionRepository.InsertSampleData();
             await SchedulingService.StartAsync();
+
+            LoggingService.Log($"AutostartNumberPlates config: {_autostartNumberPlates}");
+
+            if (_autostartNumberPlates)
+            {
+                _ = FetchNumberPlatesCommand.Execute();
+            }
 
             Console.WriteLine($"SendInitialPulse config: {_sendInitialPulse}");
 
