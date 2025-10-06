@@ -87,9 +87,21 @@
               "target": "Package",
               "version": "[8.0.0, )"
             },
+            "Polly": {
+              "target": "Package",
+              "version": "[8.6.4, )"
+            },
+            "Polly.Extensions.Http": {
+              "target": "Package",
+              "version": "[3.0.0, )"
+            },
             "Quartz": {
               "target": "Package",
               "version": "[3.15.0, )"
+            },
+            "SkiaSharp": {
+              "target": "Package",
+              "version": "[2.88.9, )"
             }
           },
           "imports": [

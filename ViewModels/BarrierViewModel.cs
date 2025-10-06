@@ -125,10 +125,10 @@ namespace Ava.ViewModels
                         if (!_numberPlateService.IsValidPlate(transaction.OcrPlate, transaction.Direction, ApiDownBehavior))
                         {
                             var reason = _numberPlateService.GetValidationReason(transaction.OcrPlate, transaction.Direction, ApiDownBehavior);
-                            _loggingService.Log($"Invalid plate '{transaction.OcrPlate}' for In transaction on {Name}, skipping pulse. Reason: {reason ?? "Unknown validation error"}");
+                            _loggingService.LogWithColor($"Invalid plate '{transaction.OcrPlate}' for In transaction on {Name}, skipping pulse. Reason: {reason ?? "Unknown validation error"}", Colors.Red);
                             return false;
                         }
-                        _loggingService.Log($"Valid In transaction for plate '{transaction.OcrPlate}', sending pulse for {Name}");
+                        _loggingService.LogWithColor($"Valid In transaction for plate '{transaction.OcrPlate}', sending pulse for {Name}", Colors.Green);
                     }
                     else
                     {
@@ -150,13 +150,13 @@ namespace Ava.ViewModels
             {
                 IndicatorColor = Brushes.Green; // Green for working
                 var pulseType = isCron ? "Cron" : "Manual";
-                _loggingService.Log($"{pulseType} pulse sent successfully for {Name}");
+                _loggingService.LogWithColor($"{pulseType} pulse sent successfully for {Name}", Colors.Green);
             }
             else
             {
                 IndicatorColor = Brushes.Red; // Red for error
                 var pulseType = isCron ? "Cron" : "Manual";
-                _loggingService.Log($"{pulseType} pulse failed for {Name}");
+                _loggingService.LogWithColor($"{pulseType} pulse failed for {Name}", Colors.Red);
             }
 
             // Update API status after pulse

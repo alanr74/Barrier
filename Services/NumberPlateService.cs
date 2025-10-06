@@ -6,6 +6,9 @@ using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using Ava.Models;
+using Avalonia.Media;
+using Polly;
+using Polly.Extensions.Http;
 
 namespace Ava.Services
 {
@@ -16,6 +19,7 @@ namespace Ava.Services
         private readonly string _apiUrl;
         private readonly List<string> _whitelistIds;
         private readonly SemaphoreSlim _fetchSemaphore = new SemaphoreSlim(1, 1);
+        private readonly IAsyncPolicy<HttpResponseMessage> _retryPolicy;
 
         private List<NumberPlateEntry> _numberPlates = new();
         private bool _allowAnyPlate;
@@ -28,6 +32,12 @@ namespace Ava.Services
             _loggingService = loggingService;
             _apiUrl = apiUrl;
             _whitelistIds = whitelistIds;
+            _retryPolicy = HttpPolicyExtensions
+                .HandleTransientHttpError()
+                .RetryAsync(3, (outcome, retryCount, context) =>
+                {
+                    _loggingService.LogWithColor($"Retry {retryCount} for number plates fetch failed: {outcome.Exception?.Message ?? outcome.Result?.StatusCode.ToString()}", Colors.Orange);
+                });
         }
 
         public async Task<bool> FetchNumberPlatesAsync()
@@ -37,7 +47,7 @@ namespace Ava.Services
             {
                 _loggingService.Log("Fetching number plates from API...");
                 var url = $"{_apiUrl}?whitelistId={string.Join(",", _whitelistIds)}";
-                var response = await _httpClient.GetAsync(url);
+                var response = await _retryPolicy.ExecuteAsync(() => _httpClient.GetAsync(url));
                 if (response.IsSuccessStatusCode)
                 {
                     var json = await response.Content.ReadAsStringAsync();
@@ -50,7 +60,7 @@ namespace Ava.Services
                     {
                         _numberPlates.Clear();
                         _numberPlates.AddRange(newPlates);
-                        _loggingService.Log($"Fetched {newPlates.Count} number plates:");
+                        _loggingService.LogWithColor($"Fetched {newPlates.Count} number plates:", Colors.Green);
                         foreach (var plate in newPlates)
                         {
                             _loggingService.Log($"  - {plate.Plate} (valid {plate.Start:yyyy-MM-dd HH:mm} to {plate.Finish:yyyy-MM-dd HH:mm})");
@@ -65,14 +75,14 @@ namespace Ava.Services
                 }
                 else
                 {
-                    _loggingService.Log($"Failed to fetch number plates: {response.StatusCode}");
+                    _loggingService.LogWithColor($"Failed to fetch number plates: {response.StatusCode}", Colors.Red);
                     HandleApiDown();
                     return false;
                 }
             }
             catch (Exception ex)
             {
-                _loggingService.Log($"Error fetching number plates: {ex.Message}");
+                _loggingService.LogWithColor($"Error fetching number plates: {ex.Message}", Colors.Red);
                 HandleApiDown();
                 return false;
             }

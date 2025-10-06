@@ -7,10 +7,33 @@ using ReactiveUI;
 using Ava.Models;
 using Ava.Repositories;
 using Ava.Services;
+using Avalonia;
+using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Media;
+using Avalonia.Threading;
 
 namespace Ava.ViewModels
 {
+    public enum Status
+    {
+        Green,
+        Amber,
+        Red
+    }
+
+    public class LogEntry
+    {
+        public string Text { get; }
+        public Color Color { get; }
+        public IBrush ColorBrush => new SolidColorBrush(Color);
+
+        public LogEntry(string text, Color color)
+        {
+            Text = text;
+            Color = color;
+        }
+    }
+
         public class MainWindowViewModel : ReactiveObject
         {
             private string _logText = "Application started.\n";
@@ -21,6 +44,7 @@ namespace Ava.ViewModels
             public static MainWindowViewModel? Instance { get; private set; }
 
             public ObservableCollection<BarrierViewModel> Barriers { get; } = new();
+            public ObservableCollection<LogEntry> LogEntries { get; } = new();
             public ITransactionRepository TransactionRepository { get; }
             public INumberPlateService NumberPlateService { get; }
             public IBarrierService BarrierService { get; }
@@ -54,7 +78,11 @@ namespace Ava.ViewModels
             public IBrush NumberPlateApiColor
             {
                 get => _numberPlateApiColor;
-                set => this.RaiseAndSetIfChanged(ref _numberPlateApiColor, value);
+                set
+                {
+                    this.RaiseAndSetIfChanged(ref _numberPlateApiColor, value);
+                    UpdateOverallStatus();
+                }
             }
 
             public bool SkipInitialCronPulse
@@ -63,7 +91,16 @@ namespace Ava.ViewModels
                 set => this.RaiseAndSetIfChanged(ref _skipInitialCronPulse, value);
             }
 
+            private Status _overallStatus = Status.Amber; // Initial amber
+
+            public Status OverallStatus
+            {
+                get => _overallStatus;
+                set => this.RaiseAndSetIfChanged(ref _overallStatus, value);
+            }
+
         public ReactiveCommand<System.Reactive.Unit, System.Reactive.Unit> FetchNumberPlatesCommand { get; }
+        public ReactiveCommand<LogEntry, System.Reactive.Unit> CopyLogEntryCommand { get; }
 
         public MainWindowViewModel(
                 ITransactionRepository transactionRepository,
@@ -81,6 +118,8 @@ namespace Ava.ViewModels
                 SchedulingService = schedulingService;
                 LoggingService = loggingService;
 
+                LoggingService.LogWithColorAction = (message, color) => LogEntries.Add(new LogEntry(message, color));
+
                 FetchNumberPlatesCommand = ReactiveCommand.CreateFromTask(async () =>
                 {
                     NumberPlateApiStatus = "Fetching...";
@@ -96,6 +135,19 @@ namespace Ava.ViewModels
                         NumberPlateApiStatus = "Failed";
                         NumberPlateApiColor = Brushes.Red;
                     }
+                });
+
+                CopyLogEntryCommand = ReactiveCommand.Create<LogEntry>(async entry =>
+                {
+                    await Dispatcher.UIThread.InvokeAsync(() =>
+                    {
+                        var desktop = Application.Current.ApplicationLifetime as IClassicDesktopStyleApplicationLifetime;
+                        var clipboard = desktop?.MainWindow?.Clipboard;
+                        if (clipboard != null)
+                        {
+                            clipboard.SetTextAsync(entry.Text);
+                        }
+                    });
                 });
 
                 LoadConfiguration();
@@ -140,6 +192,21 @@ namespace Ava.ViewModels
 
             LoggingService.Log($"Total barriers loaded: {Barriers.Count}");
 
+            // Subscribe to barrier status changes
+            foreach (var barrier in Barriers)
+            {
+                barrier.PropertyChanged += (s, e) =>
+                {
+                    if (e.PropertyName == "ApiStatusColor")
+                    {
+                        UpdateOverallStatus();
+                    }
+                };
+            }
+
+            // Initial status update
+            UpdateOverallStatus();
+
             // Initialize scheduling
             SchedulingService.Initialize(Barriers.AsEnumerable(), appConfig.NumberPlatesCronExpression, NumberPlateService);
         }
@@ -168,14 +235,38 @@ namespace Ava.ViewModels
                     try
                     {
                         var success = await barrier.SendPulseAsync(false);
-                        LoggingService.Log(success ? $"Initial pulse sent successfully for {barrier.Name}" : $"Initial pulse failed for {barrier.Name}");
+                        if (success)
+                        {
+                            LoggingService.LogWithColor($"Initial pulse sent successfully for {barrier.Name}", Colors.Green);
+                        }
+                        else
+                        {
+                            LoggingService.LogWithColor($"Initial pulse failed for {barrier.Name}", Colors.Red);
+                        }
                     }
                     catch (Exception ex)
                     {
-                        LoggingService.Log($"Initial pulse error for {barrier.Name}: {ex.Message}");
+                        LoggingService.LogWithColor($"Initial pulse error for {barrier.Name}: {ex.Message}", Colors.Red);
                     }
                 }
             }
+        }
+
+        private void UpdateOverallStatus()
+        {
+            bool hasRed = Barriers.Any(b => b.ApiStatusColor == Brushes.Red) || NumberPlateApiColor == Brushes.Red;
+            if (hasRed)
+            {
+                OverallStatus = Status.Red;
+                return;
+            }
+            bool hasAmber = Barriers.Any(b => b.ApiStatusColor == Brushes.Orange) || NumberPlateApiColor == Brushes.Orange;
+            if (hasAmber)
+            {
+                OverallStatus = Status.Amber;
+                return;
+            }
+            OverallStatus = Status.Green;
         }
 
         public void Log(string message)

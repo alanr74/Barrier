@@ -56,10 +56,30 @@
                 <RowDefinition Height="*" />
                 <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
-            <ScrollViewer x:Name="LogScrollViewer" Grid.Row="0" VerticalScrollBarVisibility="Auto">
-                <TextBox IsReadOnly="true" Text="{Binding LogText}" Margin="5"
-                    FontFamily="Consolas" AcceptsReturn="True" TextWrapping="Wrap" />
-            </ScrollViewer>
+            <ListBox x:Name="LogListBox" Grid.Row="0" ItemsSource="{Binding LogEntries}" Margin="5"
+                ScrollViewer.VerticalScrollBarVisibility="Auto">
+                <ListBox.ItemContainerTheme>
+                    <ControlTheme TargetType="ListBoxItem"
+                        BasedOn="{StaticResource {x:Type ListBoxItem}}">
+                        <Setter Property="Padding" Value="0" />
+                        <Setter Property="Margin" Value="0" />
+                    </ControlTheme>
+                </ListBox.ItemContainerTheme>
+                <ListBox.ItemTemplate>
+                    <DataTemplate>
+                        <TextBlock Text="{Binding Text}" Foreground="{Binding ColorBrush}"
+                            FontFamily="Consolas">
+                            <TextBlock.ContextMenu>
+                                <ContextMenu>
+                                    <MenuItem Header="Copy"
+                                        Command="{Binding $parent[Window].DataContext.CopyLogEntryCommand}"
+                                        CommandParameter="{Binding}" />
+                                </ContextMenu>
+                            </TextBlock.ContextMenu>
+                        </TextBlock>
+                    </DataTemplate>
+                </ListBox.ItemTemplate>
+            </ListBox>
             <ToggleButton Grid.Row="1" Content="Auto Scroll" HorizontalAlignment="Right"
                 Margin="5" IsChecked="{Binding IsAutoScrollEnabled}" />
         </Grid>

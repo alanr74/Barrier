@@ -7,6 +7,8 @@ using Ava.Services;
 using System.Net.Http;
 using Microsoft.Extensions.Configuration;
 using System.IO;
+using System.ComponentModel;
+using System.Linq;
 
 namespace Ava;
 
@@ -40,11 +42,18 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
             loggingService);
 
         // Set logging actions
-        loggingService.LogAction = msg => ViewModel.LogText += msg;
-        loggingService.ScrollAction = () => { if (ViewModel.IsAutoScrollEnabled) LogScrollViewer!.ScrollToEnd(); };
+        loggingService.ScrollAction = () => { if (ViewModel.IsAutoScrollEnabled && ViewModel.LogEntries.Any()) LogListBox!.ScrollIntoView(ViewModel.LogEntries.Last()); };
 
         DataContext = ViewModel;
 
+        // Handle closing to hide instead of exit
+        Closing += MainWindow_Closing;
+    }
 
+    private void MainWindow_Closing(object? sender, CancelEventArgs e)
+    {
+        e.Cancel = true;
+        Hide();
+        ShowInTaskbar = false;
     }
 }
