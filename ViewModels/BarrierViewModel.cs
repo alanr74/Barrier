@@ -1,6 +1,8 @@
 using System;
 using System.Linq;
 using System.Net.Http;
+using System.Reactive.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Input;
 using Avalonia.Media;
@@ -14,6 +16,7 @@ namespace Ava.ViewModels
     public class BarrierViewModel : ReactiveObject
     {
         private bool _isEnabled;
+        private bool _isSendingPulse;
         private IBrush _indicatorColor = Brushes.Orange; // Amber for unknown
         private string _lastNumberPlate = "No data";
 
@@ -28,11 +31,18 @@ namespace Ava.ViewModels
         private readonly ILoggingService _loggingService;
         private readonly INumberPlateService _numberPlateService;
         private readonly ITransactionRepository _transactionRepository;
+        private readonly SemaphoreSlim _pulseSemaphore = new SemaphoreSlim(1, 1);
 
         public bool IsEnabled
         {
             get => _isEnabled;
             set => this.RaiseAndSetIfChanged(ref _isEnabled, value);
+        }
+
+        public bool IsSendingPulse
+        {
+            get => _isSendingPulse;
+            set => this.RaiseAndSetIfChanged(ref _isSendingPulse, value);
         }
 
         public IBrush IndicatorColor
@@ -83,7 +93,18 @@ namespace Ava.ViewModels
 
             LastProcessedDate = startupTime;
 
-            SendPulseCommand = ReactiveCommand.CreateFromTask(() => SendPulseAsync(false));
+            SendPulseCommand = ReactiveCommand.CreateFromTask(async () =>
+            {
+                IsSendingPulse = true;
+                try
+                {
+                    await SendPulseAsync(false);
+                }
+                finally
+                {
+                    IsSendingPulse = false;
+                }
+            }, this.WhenAnyValue(x => x.IsSendingPulse).Select(b => !b));
         }
 
         public async Task UpdateApiStatusAsync()
@@ -105,64 +126,72 @@ namespace Ava.ViewModels
 
         public async Task<bool> SendPulseAsync(bool isCron = false)
         {
-            Console.WriteLine($"SendPulseAsync called for {Name}, isCron: {isCron} at {DateTime.Now}");
-
-            if (isCron && !IsEnabled) return false;
-
-            // For cron, get next transaction; for manual, don't read db
-            if (isCron)
+            await _pulseSemaphore.WaitAsync();
+            try
             {
-                var transaction = _transactionRepository.GetNextTransaction(LaneId, LastProcessedDate);
-                if (transaction != null)
-                {
-                    LastNumberPlate = transaction.OcrPlate;
-                    LastProcessedDate = transaction.Created;
-                    _loggingService.Log($"Processing transaction for {Name}: {LastNumberPlate}");
+                Console.WriteLine($"SendPulseAsync called for {Name}, isCron: {isCron} at {DateTime.Now}");
 
-                    // For In (direction 1), check plate validity; for Out (0), always pulse
-                    if (transaction.Direction == 1)
+                if (isCron && !IsEnabled) return false;
+
+                // For cron, get next transaction; for manual, don't read db
+                if (isCron)
+                {
+                    var transaction = _transactionRepository.GetNextTransaction(LaneId, LastProcessedDate);
+                    if (transaction != null)
                     {
-                        if (!_numberPlateService.IsValidPlate(transaction.OcrPlate, transaction.Direction, ApiDownBehavior))
+                        LastNumberPlate = transaction.OcrPlate;
+                        LastProcessedDate = transaction.Created;
+                        _loggingService.Log($"Processing transaction for {Name}: {LastNumberPlate}");
+
+                        // For In (direction 1), check plate validity; for Out (0), always pulse
+                        if (transaction.Direction == 1)
                         {
-                            var reason = _numberPlateService.GetValidationReason(transaction.OcrPlate, transaction.Direction, ApiDownBehavior);
-                            _loggingService.LogWithColor($"Invalid plate '{transaction.OcrPlate}' for In transaction on {Name}, skipping pulse. Reason: {reason ?? "Unknown validation error"}", Colors.Red);
-                            return false;
+                            if (!_numberPlateService.IsValidPlate(transaction.OcrPlate, transaction.Direction, ApiDownBehavior))
+                            {
+                                var reason = _numberPlateService.GetValidationReason(transaction.OcrPlate, transaction.Direction, ApiDownBehavior);
+                                _loggingService.LogWithColor($"Invalid plate '{transaction.OcrPlate}' for In transaction on {Name}, skipping pulse. Reason: {reason ?? "Unknown validation error"}", Colors.Red);
+                                return false;
+                            }
+                            _loggingService.LogWithColor($"Valid In transaction for plate '{transaction.OcrPlate}', sending pulse for {Name}", Colors.Green);
                         }
-                        _loggingService.LogWithColor($"Valid In transaction for plate '{transaction.OcrPlate}', sending pulse for {Name}", Colors.Green);
+                        else
+                        {
+                            _loggingService.Log($"Out transaction, sending pulse for {Name}");
+                        }
                     }
                     else
                     {
-                        _loggingService.Log($"Out transaction, sending pulse for {Name}");
+                        _loggingService.Log($"No pending transactions for {Name}, skipping cron pulse");
+                        return false;
                     }
                 }
                 else
                 {
-                    _loggingService.Log($"No pending transactions for {Name}, skipping cron pulse");
-                    return false;
                 }
-            }
-            else
-            {
-            }
 
-            var success = await _barrierService.SendPulseAsync(ApiUrl, Name);
-            if (success)
-            {
-                IndicatorColor = Brushes.Green; // Green for working
-                var pulseType = isCron ? "Cron" : "Manual";
-                _loggingService.LogWithColor($"{pulseType} pulse sent successfully for {Name}", Colors.Green);
-            }
-            else
-            {
-                IndicatorColor = Brushes.Red; // Red for error
-                var pulseType = isCron ? "Cron" : "Manual";
-                _loggingService.LogWithColor($"{pulseType} pulse failed for {Name}", Colors.Red);
-            }
+                var success = await _barrierService.SendPulseAsync(ApiUrl, Name, isCron ? 3 : 0);
+                if (success)
+                {
+                    IndicatorColor = Brushes.Green; // Green for working
+                    var pulseType = isCron ? "Cron" : "Manual";
+                    _loggingService.LogWithColor($"{pulseType} pulse sent successfully for {Name}", Colors.Green);
+                }
+                else
+                {
+                    IndicatorColor = Brushes.Red; // Red for error
+                    var pulseType = isCron ? "Cron" : "Manual";
+                    _loggingService.LogWithColor($"{pulseType} pulse failed for {Name}", Colors.Red);
+                }
 
-            // Update API status after pulse
-            await UpdateApiStatusAsync();
+                // Update API status after pulse
+                await UpdateApiStatusAsync();
 
-            return success;
+                return success;
+            }
+            finally
+            {
+                _pulseSemaphore.Release();
+            }
         }
     }
 }

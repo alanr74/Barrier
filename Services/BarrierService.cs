@@ -11,26 +11,25 @@ namespace Ava.Services
     {
         private readonly HttpClient _httpClient;
         private readonly ILoggingService _loggingService;
-        private readonly IAsyncPolicy<HttpResponseMessage> _retryPolicy;
 
         public BarrierService(HttpClient httpClient, ILoggingService loggingService)
         {
             _httpClient = httpClient;
             _loggingService = loggingService;
-            _retryPolicy = HttpPolicyExtensions
-                .HandleTransientHttpError()
-                .RetryAsync(3, (outcome, retryCount, context) =>
-                {
-                    _loggingService.LogWithColor($"Retry {retryCount} for API call failed: {outcome.Exception?.Message ?? outcome.Result?.StatusCode.ToString()}", Colors.Orange);
-                });
         }
 
-        public async Task<bool> SendPulseAsync(string apiUrl, string barrierName)
+        public async Task<bool> SendPulseAsync(string apiUrl, string barrierName, int retryCount = 3)
         {
             _loggingService.Log($"Sending pulse to {apiUrl} for {barrierName}");
+            var retryPolicy = HttpPolicyExtensions
+                .HandleTransientHttpError()
+                .RetryAsync(retryCount, (outcome, retryCount, context) =>
+                {
+                    _loggingService.LogWithColor($"Retry {retryCount} for {barrierName} API call failed: {outcome.Exception?.Message ?? outcome.Result?.StatusCode.ToString()}", Colors.Orange);
+                });
             try
             {
-                var response = await _retryPolicy.ExecuteAsync(() => _httpClient.PostAsync(apiUrl, null));
+                var response = await retryPolicy.ExecuteAsync(() => _httpClient.PostAsync(apiUrl, null));
                 if (response.IsSuccessStatusCode)
                 {
                     _loggingService.LogWithColor($"Pulse sent successfully for {barrierName}", Colors.Green);
@@ -52,7 +51,7 @@ namespace Ava.Services
         {
             try
             {
-                var response = await _retryPolicy.ExecuteAsync(() => _httpClient.GetAsync(apiUrl));
+                var response = await _httpClient.GetAsync(apiUrl);
                 if (response.IsSuccessStatusCode)
                 {
                     return ApiStatus.Up;

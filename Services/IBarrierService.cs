@@ -11,7 +11,7 @@ namespace Ava.Services
 
     public interface IBarrierService
     {
-        Task<bool> SendPulseAsync(string apiUrl, string barrierName);
+        Task<bool> SendPulseAsync(string apiUrl, string barrierName, int retryCount = 3);
         Task<ApiStatus> CheckApiStatusAsync(string apiUrl, string barrierName);
     }
 }

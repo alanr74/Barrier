@@ -6,6 +6,10 @@
 - Removed unit tests project to simplify the codebase
 - Enhanced logging for invalid plate validation with specific reasons (not found, expired, not yet valid)
 - Made ApiDownBehavior configurable per barrier
+- Implemented intelligent retry logic: Manual pulses attempt once, cron pulses retry up to 3 times
+- Added concurrency control to prevent multiple simultaneous requests to the same API endpoint
+- Optimized logging by removing retries from API status checks to reduce log noise
+- Enhanced UI responsiveness with disabled buttons during pulse operations
 
 A C# Avalonia-based desktop application for managing automated barrier controls with number plate validation and scheduling.
 
