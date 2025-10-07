@@ -28,5 +28,6 @@ namespace Ava
         public bool SkipInitialCronPulse { get; set; } = false;
         public bool PerformInitialApiStatusCheck { get; set; } = true;
         public bool AutostartNumberPlates { get; set; } = true;
+        public bool StartOpenOnLaunch { get; set; } = false;
     }
 }

@@ -10,6 +10,9 @@
 - Added concurrency control to prevent multiple simultaneous requests to the same API endpoint
 - Optimized logging by removing retries from API status checks to reduce log noise
 - Enhanced UI responsiveness with disabled buttons during pulse operations
+- Added system tray integration with right-click menu including Settings option
+- Implemented read-only settings viewer with red highlighting for unset configuration values
+- Added configurable "Start Open on Launch" option for window visibility on startup
 
 A C# Avalonia-based desktop application for managing automated barrier controls with number plate validation and scheduling.
 
@@ -26,6 +29,9 @@ This application controls multiple barriers that open/close based on vehicle tra
 - **Fallback Modes**: Configurable behavior when APIs are down (per barrier)
 - **Real-time Monitoring**: Live logging and status indicators
 - **Manual Controls**: UI buttons for manual operations
+- **Tray Icon Integration**: System tray icon with right-click menu for quick access
+- **Settings Viewer**: Read-only configuration viewer with visual highlighting of unset values
+- **Launch Options**: Configurable window visibility on application startup
 
 ## Architecture
 
@@ -142,7 +148,8 @@ Services are manually injected in `MainWindow.xaml.cs`. In production, use a DI 
     }
   },
   "NumberPlatesApiUrl": "https://api.example.com/numberplates",
-  "NumberPlatesCronExpression": "0 0 * * * ?"
+  "NumberPlatesCronExpression": "0 0 * * * ?",
+  "StartOpenOnLaunch": false
 }
 ```
 
@@ -266,6 +273,8 @@ Uses Quartz.NET for job scheduling with cron expressions:
 - **Number Plate Fetch**: Manual data refresh button
 - **Log Console**: Real-time operation logging with auto-scroll
 - **Status Indicators**: Visual feedback for barrier states
+- **System Tray**: Minimizes to system tray on close, with right-click menu for Show, Settings, and Exit
+- **Settings Window**: Read-only viewer of all configuration settings with red highlighting for unset/empty values
 
 ## Dependencies
 

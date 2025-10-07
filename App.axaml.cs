@@ -7,6 +7,7 @@ using System.Globalization;
 using System.IO;
 using Ava.ViewModels;
 using SkiaSharp;
+using Microsoft.Extensions.Configuration;
 
 namespace Ava;
 
@@ -79,6 +80,14 @@ public partial class App : Application
     {
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
+            // Read config
+            var config = new ConfigurationBuilder()
+                .SetBasePath(Directory.GetCurrentDirectory())
+                .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true)
+                .Build();
+
+            var appConfig = config.Get<Ava.AppConfig>() ?? new AppConfig();
+
             var mainWindow = new MainWindow();
             desktop.MainWindow = mainWindow;
 
@@ -98,6 +107,13 @@ public partial class App : Application
                 mainWindow.Activate();
             };
 
+            var settingsMenuItem = new NativeMenuItem("Settings");
+            settingsMenuItem.Click += (s, e) =>
+            {
+                var settingsWindow = new SettingsWindow(appConfig);
+                settingsWindow.Show();
+            };
+
             var exitMenuItem = new NativeMenuItem("Exit");
             exitMenuItem.Click += (s, e) =>
             {
@@ -113,7 +129,7 @@ public partial class App : Application
 
             _trayIcon.Menu = new NativeMenu
             {
-                Items = { showMenuItem, exitMenuItem }
+                Items = { showMenuItem, settingsMenuItem, exitMenuItem }
             };
 
             // Create icons
@@ -138,10 +154,13 @@ public partial class App : Application
                 };
             }
 
-            // Start minimized to tray
-            mainWindow.WindowState = WindowState.Minimized;
-            mainWindow.ShowInTaskbar = false;
-            mainWindow.Hide();
+            // Start minimized to tray if not set to start open
+            if (!appConfig.StartOpenOnLaunch)
+            {
+                mainWindow.WindowState = WindowState.Minimized;
+                mainWindow.ShowInTaskbar = false;
+                mainWindow.Hide();
+            }
         }
 
         base.OnFrameworkInitializationCompleted();

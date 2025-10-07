@@ -24,7 +24,7 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
             .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true)
             .Build();
 
-        var appConfig = config.Get<Ava.AppConfig>();
+        var appConfig = config.Get<Ava.AppConfig>() ?? new AppConfig();
 
         // Create services (in a real app, use DI container)
         var httpClient = new HttpClient();
@@ -42,7 +42,7 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
             loggingService);
 
         // Set logging actions
-        loggingService.ScrollAction = () => { if (ViewModel.IsAutoScrollEnabled && ViewModel.LogEntries.Any()) LogListBox!.ScrollIntoView(ViewModel.LogEntries.Last()); };
+        loggingService.ScrollAction = () => { if (ViewModel.IsAutoScrollEnabled && ViewModel.LogEntries.Any()) LogListBox!.ScrollIntoView(ViewModel.LogEntries[^1]); };
 
         DataContext = ViewModel;
 
