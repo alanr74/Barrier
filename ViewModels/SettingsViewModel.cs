@@ -2,6 +2,8 @@ using ReactiveUI;
 using System.Collections.ObjectModel;
 using System.Linq;
 using Avalonia.Media;
+using Avalonia;
+using Avalonia.Styling;
 
 namespace Ava.ViewModels;
 
@@ -20,6 +22,7 @@ public class SettingsViewModel : ReactiveObject
     private void LoadSettings()
     {
         // App level settings
+        AddSetting("Screen Mode", _config.ScreenMode);
         AddSetting("Number Plates API URL", _config.NumberPlatesApiUrl);
         AddSetting("Number Plates Cron Expression", _config.NumberPlatesCronExpression);
         AddSetting("Whitelist IDs", string.Join(", ", _config.WhitelistIds ?? new()));
@@ -62,5 +65,18 @@ public class SettingItem : ReactiveObject
         get => _isUnset;
         set => this.RaiseAndSetIfChanged(ref _isUnset, value);
     }
-    public IBrush Color => IsUnset ? Brushes.Red : Brushes.Black;
+    public IBrush Color
+    {
+        get
+        {
+            if (IsUnset)
+            {
+                return Brushes.Red;
+            }
+            else
+            {
+                return Application.Current?.RequestedThemeVariant == ThemeVariant.Dark ? Brushes.White : Brushes.Black;
+            }
+        }
+    }
 }

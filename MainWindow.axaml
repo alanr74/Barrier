@@ -80,8 +80,9 @@
                     </DataTemplate>
                 </ListBox.ItemTemplate>
             </ListBox>
-            <ToggleButton Grid.Row="1" Content="Auto Scroll" HorizontalAlignment="Right"
-                Margin="5" IsChecked="{Binding IsAutoScrollEnabled}" />
+            <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Right" Margin="5">
+                <ToggleSwitch Content="Auto Scroll" IsChecked="{Binding IsAutoScrollEnabled}" />
+            </StackPanel>
         </Grid>
 
         <!-- Pulse Indicators -->

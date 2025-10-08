@@ -29,5 +29,6 @@ namespace Ava
         public bool PerformInitialApiStatusCheck { get; set; } = true;
         public bool AutostartNumberPlates { get; set; } = true;
         public bool StartOpenOnLaunch { get; set; } = false;
+        public string ScreenMode { get; set; } = "System";
     }
 }

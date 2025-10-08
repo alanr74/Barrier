@@ -8,8 +8,10 @@ using Ava.Models;
 using Ava.Repositories;
 using Ava.Services;
 using Avalonia;
+using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Media;
+using Avalonia.Styling;
 using Avalonia.Threading;
 
 namespace Ava.ViewModels
@@ -21,22 +23,39 @@ namespace Ava.ViewModels
         Red
     }
 
-    public class LogEntry
+    public class LogEntry : ReactiveObject
     {
+        private Color _color;
+        private IBrush _colorBrush;
+
         public string Text { get; }
-        public Color Color { get; }
-        public IBrush ColorBrush => new SolidColorBrush(Color);
+        public Color Color
+        {
+            get => _color;
+            set
+            {
+                if (_color != value)
+                {
+                    _color = value;
+                    this.RaisePropertyChanged(nameof(Color));
+                    _colorBrush = new SolidColorBrush(value);
+                    this.RaisePropertyChanged(nameof(ColorBrush));
+                }
+            }
+        }
+        public IBrush ColorBrush => _colorBrush;
 
         public LogEntry(string text, Color color)
         {
             Text = text;
             Color = color;
+            _colorBrush = new SolidColorBrush(color);
         }
     }
 
         public class MainWindowViewModel : ReactiveObject
         {
-            private string _logText = "Application started.\n";
+        private string _logText = "Application started.\n";
             private bool _isAutoScrollEnabled = true;
             private string _numberPlateApiStatus = "Waiting";
             private IBrush _numberPlateApiColor = Brushes.Orange; // Amber for waiting
@@ -267,6 +286,28 @@ namespace Ava.ViewModels
                 return;
             }
             OverallStatus = Status.Green;
+        }
+
+        private void UpdateLogColors(bool isDark)
+        {
+            foreach (var entry in LogEntries)
+            {
+                if (isDark)
+                {
+                    if (entry.Color == Colors.Black) entry.Color = Colors.LightGray;
+                    else if (entry.Color == Colors.DarkGreen) entry.Color = Colors.LightGreen;
+                    else if (entry.Color == Colors.DarkRed) entry.Color = Colors.LightCoral;
+                    else if (entry.Color == Colors.DarkOrange) entry.Color = Colors.Yellow;
+                }
+                else
+                {
+                    if (entry.Color == Colors.LightGray) entry.Color = Colors.Black;
+                    else if (entry.Color == Colors.LightGreen) entry.Color = Colors.DarkGreen;
+                    else if (entry.Color == Colors.LightCoral) entry.Color = Colors.DarkRed;
+                    else if (entry.Color == Colors.Yellow) entry.Color = Colors.DarkOrange;
+                }
+                // Add more mappings as needed
+            }
         }
 
         public void Log(string message)

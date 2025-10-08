@@ -3,6 +3,8 @@ using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
 using Avalonia.Media;
+using Avalonia.Styling;
+using Avalonia.Themes.Fluent;
 using System.Globalization;
 using System.IO;
 using Ava.ViewModels;
@@ -17,6 +19,7 @@ public partial class App : Application
     private WindowIcon? _greenIcon;
     private WindowIcon? _amberIcon;
     private WindowIcon? _redIcon;
+    private AppConfig? _appConfig;
 
     private WindowIcon CreateTrayIcon(Color color)
     {
@@ -71,6 +74,28 @@ public partial class App : Application
         }
     }
 
+    public void SetTheme(string screenMode)
+    {
+        ThemeVariant themeVariant;
+        switch (screenMode.ToLower())
+        {
+            case "dark":
+                themeVariant = ThemeVariant.Dark;
+                break;
+            case "light":
+                themeVariant = ThemeVariant.Light;
+                break;
+            case "system":
+            default:
+                themeVariant = ThemeVariant.Default;
+                break;
+        }
+        RequestedThemeVariant = themeVariant;
+        // Force style update
+        Application.Current.Styles.Clear();
+        Application.Current.Styles.Add(new FluentTheme());
+    }
+
     public override void Initialize()
     {
         AvaloniaXamlLoader.Load(this);
@@ -86,7 +111,10 @@ public partial class App : Application
                 .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true)
                 .Build();
 
-            var appConfig = config.Get<Ava.AppConfig>() ?? new AppConfig();
+            _appConfig = config.Get<Ava.AppConfig>() ?? new AppConfig();
+
+            // Set initial theme
+            SetTheme(_appConfig.ScreenMode);
 
             var mainWindow = new MainWindow();
             desktop.MainWindow = mainWindow;
@@ -110,7 +138,7 @@ public partial class App : Application
             var settingsMenuItem = new NativeMenuItem("Settings");
             settingsMenuItem.Click += (s, e) =>
             {
-                var settingsWindow = new SettingsWindow(appConfig);
+                var settingsWindow = new SettingsWindow(_appConfig);
                 settingsWindow.Show();
             };
 
@@ -155,7 +183,7 @@ public partial class App : Application
             }
 
             // Start minimized to tray if not set to start open
-            if (!appConfig.StartOpenOnLaunch)
+            if (!_appConfig.StartOpenOnLaunch)
             {
                 mainWindow.WindowState = WindowState.Minimized;
                 mainWindow.ShowInTaskbar = false;
