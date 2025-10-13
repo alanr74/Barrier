@@ -25,7 +25,7 @@ public class SettingsViewModel : ReactiveObject
         AddSetting("Screen Mode", _config.ScreenMode);
         AddSetting("Number Plates API URL", _config.NumberPlatesApiUrl);
         AddSetting("Number Plates Cron Expression", _config.NumberPlatesCronExpression);
-        AddSetting("Whitelist IDs", string.Join(", ", _config.WhitelistIds ?? new()));
+        AddSetting("Whitelist IDs", string.Join(", ", _config.WhitelistCredentials.Select(x => x.Id).ToList()));
         AddSetting("Send Initial Pulse", _config.SendInitialPulse.ToString());
         AddSetting("Skip Initial Cron Pulse", _config.SkipInitialCronPulse.ToString());
         AddSetting("Perform Initial API Status Check", _config.PerformInitialApiStatusCheck.ToString());

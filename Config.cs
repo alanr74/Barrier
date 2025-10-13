@@ -31,12 +31,19 @@ namespace Ava
         public int BarrierTimeout { get; set; }
     }
 
+    public class WhitelistCredential
+    {
+        public string Id { get; set; } = string.Empty;
+        public string Username { get; set; } = string.Empty;
+        public string Password { get; set; } = string.Empty;
+    }
+
     public class AppConfig
     {
         public BarriersConfig Barriers { get; set; } = new();
         public string NumberPlatesApiUrl { get; set; } = string.Empty;
         public string NumberPlatesCronExpression { get; set; } = "0 0 * * * ?";
-        public List<string> WhitelistIds { get; set; } = new();
+        public List<WhitelistCredential> WhitelistCredentials { get; set; } = new();
         public bool SendInitialPulse { get; set; } = true;
         public bool SkipInitialCronPulse { get; set; } = false;
         public bool PerformInitialApiStatusCheck { get; set; } = true;

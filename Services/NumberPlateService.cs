@@ -17,7 +17,7 @@ namespace Ava.Services
         private readonly HttpClient _httpClient;
         private readonly ILoggingService _loggingService;
         private readonly string _apiUrl;
-        private readonly List<string> _whitelistIds;
+        private readonly List<WhitelistCredential> _whitelistCredentials;
         private readonly SemaphoreSlim _fetchSemaphore = new SemaphoreSlim(1, 1);
         private readonly IAsyncPolicy<HttpResponseMessage> _retryPolicy;
 
@@ -26,18 +26,12 @@ namespace Ava.Services
 
         public bool AllowAnyPlate => _allowAnyPlate;
 
-        public NumberPlateService(HttpClient httpClient, ILoggingService loggingService, string apiUrl, List<string> whitelistIds)
+        public NumberPlateService(HttpClient httpClient, ILoggingService loggingService, string apiUrl, List<WhitelistCredential> whitelistCredentials)
         {
             _httpClient = httpClient;
             _loggingService = loggingService;
             _apiUrl = apiUrl;
-            _whitelistIds = whitelistIds;
-            _retryPolicy = HttpPolicyExtensions
-                .HandleTransientHttpError()
-                .RetryAsync(3, (outcome, retryCount, context) =>
-                {
-                    _loggingService.LogWithColor($"Retry {retryCount} for number plates fetch failed: {outcome.Exception?.Message ?? outcome.Result?.StatusCode.ToString()}", Colors.Orange);
-                });
+            _whitelistCredentials = whitelistCredentials;
         }
 
         public async Task<bool> FetchNumberPlatesAsync()
@@ -46,43 +40,79 @@ namespace Ava.Services
             try
             {
                 _loggingService.Log("Fetching number plates from API...");
-                var url = $"{_apiUrl}?whitelistId={string.Join(",", _whitelistIds)}";
-                var response = await _retryPolicy.ExecuteAsync(() => _httpClient.GetAsync(url));
-                if (response.IsSuccessStatusCode)
+                var allPlates = new List<NumberPlateEntry>();
+                var hasAnySuccess = false;
+
+                foreach (var credential in _whitelistCredentials)
                 {
-                    var json = await response.Content.ReadAsStringAsync();
-                    var options = new JsonSerializerOptions
+                    try
                     {
-                        PropertyNameCaseInsensitive = true
-                    };
-                    var newPlates = JsonSerializer.Deserialize<List<NumberPlateEntry>>(json, options);
-                    if (newPlates != null)
-                    {
-                        _numberPlates.Clear();
-                        _numberPlates.AddRange(newPlates);
-                        _loggingService.LogWithColor($"Fetched {newPlates.Count} number plates:", Colors.Green);
-                        foreach (var plate in newPlates)
+                        var url = _apiUrl.Replace("{id}", credential.Id);
+                        _loggingService.Log($"Fetching whitelist for {credential.Id} from {url}");
+
+                        // Create HttpClient with specific basic auth for this whitelist ID
+                        var client = new HttpClient();
+
+                        // Create per-ID retry policy with URL in context for better error logging
+                        var retryPolicy = HttpPolicyExtensions
+                            .HandleTransientHttpError()
+                            .RetryAsync(3, (outcome, retryCount, context) =>
+                            {
+                                _loggingService.LogWithColor($"Retry {retryCount} for number plates fetch on {url} failed: {outcome.Exception?.Message ?? outcome.Result?.StatusCode.ToString()}", Colors.Orange);
+                            });
+
+                        var authToken = Convert.ToBase64String(
+                            System.Text.Encoding.ASCII.GetBytes($"{credential.Username}:{credential.Password}")
+                        );
+                        client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Basic", authToken);
+
+                        var response = await retryPolicy.ExecuteAsync(() => client.GetAsync(url));
+
+                        if (response.IsSuccessStatusCode)
                         {
-                            _loggingService.Log($"  - {plate.Plate} (valid {plate.Start:yyyy-MM-dd HH:mm} to {plate.Finish:yyyy-MM-dd HH:mm})");
+                            var json = await response.Content.ReadAsStringAsync();
+                            var options = new JsonSerializerOptions
+                            {
+                                PropertyNameCaseInsensitive = true
+                            };
+                            var plates = JsonSerializer.Deserialize<List<NumberPlateEntry>>(json, options);
+                            if (plates != null && plates.Any())
+                            {
+                                allPlates.AddRange(plates);
+                                _loggingService.LogWithColor($"Fetched {plates.Count} plates for {credential.Id}", Colors.Green);
+                                hasAnySuccess = true;
+                            }
+                            else
+                            {
+                                _loggingService.LogWithColor($"No plates returned for {credential.Id}", Colors.Orange);
+                            }
+                        }
+                        else
+                        {
+                            _loggingService.LogWithColor($"Failed to fetch plates for {credential.Id}: {response.StatusCode}", Colors.Red);
                         }
                     }
-                    else
+                    catch (Exception ex)
                     {
-                        _loggingService.Log("Failed to deserialize number plates data.");
+                        _loggingService.LogWithColor($"Error fetching plates for {credential.Id}: {ex.Message}", Colors.Red);
                     }
-                    _allowAnyPlate = false;
-                    return true;
                 }
-                else
+
+                // Update the global list
+                _numberPlates.Clear();
+                _numberPlates.AddRange(allPlates);
+                _loggingService.LogWithColor($"Total fetched: {allPlates.Count} number plates across all whitelists", Colors.Green);
+                foreach (var plate in allPlates)
                 {
-                    _loggingService.LogWithColor($"Failed to fetch number plates: {response.StatusCode}", Colors.Red);
-                    HandleApiDown();
-                    return false;
+                    _loggingService.Log($"  - {plate.Plate} (valid {plate.Start:yyyy-MM-dd HH:mm} to {plate.Finish:yyyy-MM-dd HH:mm})");
                 }
+
+                _allowAnyPlate = false;
+                return hasAnySuccess;
             }
             catch (Exception ex)
             {
-                _loggingService.LogWithColor($"Error fetching number plates: {ex.Message}", Colors.Red);
+                _loggingService.LogWithColor($"Critical error fetching number plates: {ex.Message}", Colors.Red);
                 HandleApiDown();
                 return false;
             }
