@@ -1,280 +1,57 @@
-# Barrier Control System
+### Barrier Control
 
-## Recent Changes
+**URL**: Configurable per barrier
 
-- Migrated from .NET 9 preview to .NET 8 for stability
-- Removed unit tests project to simplify the codebase
-- Enhanced logging for invalid plate validation with specific reasons (not found, expired, not yet valid)
-- Made ApiDownBehavior configurable per barrier
-- Implemented intelligent retry logic: Manual pulses attempt once, cron pulses retry up to 3 times
-- Added concurrency control to prevent multiple simultaneous requests to the same API endpoint
-- Optimized logging by removing retries from API status checks to reduce log noise
-- Enhanced UI responsiveness with disabled buttons during pulse operations
-- Added system tray integration with right-click menu including Settings option
-- Implemented read-only settings viewer with red highlighting for unset configuration values
-- Added configurable "Start Open on Launch" option for window visibility on startup
+**Method**: POST
 
-A C# Avalonia-based desktop application for managing automated barrier controls with number plate validation and scheduling.
+**Purpose**: Send pulse signal to hardware
 
-## Overview
+## Testing
 
-This application controls multiple barriers that open/close based on vehicle transactions. It integrates with external APIs for number plate data and uses scheduled jobs to automate barrier operations. The system supports different fallback behaviors when the number plate API is unavailable, now configurable per barrier.
+### Camera Integration Test
 
-## Features
+Run the camera integration test script:
 
-- **Multi-Barrier Management**: Control multiple barriers with individual configurations
-- **Automated Scheduling**: Cron-based jobs for barrier operations and data fetching
-- **Number Plate Validation**: Check incoming vehicles against authorized number plates with date/time ranges
-- **API Integration**: Fetch number plate data from external APIs
-- **Fallback Modes**: Configurable behavior when APIs are down (per barrier)
-- **Real-time Monitoring**: Live logging and status indicators
-- **Manual Controls**: UI buttons for manual operations
-- **Tray Icon Integration**: System tray icon with right-click menu for quick access
-- **Settings Viewer**: Read-only configuration viewer with visual highlighting of unset values
-- **Launch Options**: Configurable window visibility on application startup
+```bash
+./test-camera.ps1
+```
+
+This sends a camera detection payload to the `/api/camera` endpoint and logs the response.
+
+### Testing Strategies
+
+- **Manual Buttons**: Use UI barrier buttons to test individual pulse operations
+- **Configurable Modes**: Test both `"db"` and `"camera"` pulse trigger modes
+- **Error Scenarios**: Test with invalid URLs to verify retry and error logging
+- **Multi-Whitelist**: Verify different auth credentials work per whitelist ID
 
 ## Architecture
 
 The application follows SOLID principles with a clean layered architecture and dependency injection:
 
-### Layers
-
-- **Presentation (ViewModels)**: MVVM view models handling UI logic and data binding
-- **Application (Services)**: Business logic services with dependency injection
-- **Domain (Models)**: Data models and domain entities
-- **Infrastructure (Repositories)**: Data access abstractions
-
-### SOLID Principles Implementation
-
-#### **Single Responsibility**
-
-- Each service handles one specific concern (logging, scheduling, number plates, barriers)
-- Repositories focus solely on data access
-- ViewModels manage UI state and coordinate services
-
-#### **Open/Closed**
-
-- Interfaces allow extension without modifying existing code
-- Services can be swapped with different implementations
-
-#### **Liskov Substitution**
-
-- All implementations properly substitute their interfaces
-- BarrierViewModel can work with any IBarrierService implementation
-
-#### **Interface Segregation**
-
-- Focused interfaces that clients actually need
-- `INumberPlateService`, `IBarrierService`, `ISchedulingService`, `ILoggingService`, `ITransactionRepository`
-
-#### **Dependency Inversion**
-
-- High-level modules (ViewModels) depend on abstractions (interfaces)
-- Low-level modules (Services) implement interfaces
-- Dependencies injected through constructors
-
 ### Core Components
 
-- **MainWindowViewModel**: Orchestrates application startup, configuration, and service coordination
-- **BarrierViewModel**: Manages individual barrier state and operations
-- **Services**: Business logic implementations with interfaces
-- **Repositories**: Data access layer with SQLite
-- **Models**: Domain entities (Transaction, NumberPlateEntry)
-
-### Key Interfaces & Implementations
-
-- `INumberPlateService` → `NumberPlateService`: Manages authorized plates, validation, API fallback logic
-- `IBarrierService` → `BarrierService`: Handles barrier hardware communication
-- `ISchedulingService` → `SchedulingService`: Quartz.NET job orchestration
-- `ILoggingService` → `LoggingService`: Centralized logging with UI integration
-- `ITransactionRepository` → `TransactionRepository`: Transaction data access
-
-### Dependency Injection
-
-Services are manually injected in `MainWindow.xaml.cs`. In production, use a DI container like:
-
-- Microsoft.Extensions.DependencyInjection
-- Autofac
-- Ninject
+- **CameraController**: Handles camera API data ingestion and optional auto-pulse triggers
+- **NumberPlateService**: Manages multi-auth whitelist fetching with per-ID credentials
+- **BarrierViewModel**: Manages individual barriers with "Manual", "Cron", or "Camera" pulse sources
+- **TransactionRepository**: Handles camera data storage with UTC→local time normalization
 
 ### Project Structure
 
 ```
-├── Models/                 # Domain entities
-│   ├── Transaction.cs
-│   └── NumberPlateEntry.cs
-├── Repositories/           # Data access layer
-│   ├── ITransactionRepository.cs
-│   └── TransactionRepository.cs
-├── Services/              # Business logic services
-│   ├── ILoggingService.cs & LoggingService.cs
-│   ├── INumberPlateService.cs & NumberPlateService.cs
-│   ├── IBarrierService.cs & BarrierService.cs
-│   └── ISchedulingService.cs & SchedulingService.cs
-├── ViewModels/            # MVVM view models
-│   ├── MainWindowViewModel.cs
-│   └── BarrierViewModel.cs
-├── Config.cs              # Configuration classes
-└── appsettings.json       # Application settings
+├── Controllers/
+│   └── CameraController.cs      # Camera API endpoint
+├── Models/
+│   ├── Transaction.cs           # Camera/barrier transaction data
+│   └── CameraMessage.cs         # Camera detection payload
+├── Services/
+│   ├── NumberPlateService.cs    # Multi-auth number plate fetching
+│   └── BarrierService.cs        # Hardware communication
+├── ViewModels/
+│   ├── MainWindowViewModel.cs   # App coordination
+│   └── BarrierViewModel.cs      # Individual barrier management
+└── appsettings.json             # Configuration with WhitelistCredentials
 ```
-
-## Configuration
-
-### appsettings.json Structure
-
-```json
-{
-  "Barriers": {
-    "Count": 3,
-    "Barriers": {
-      "Barrier1": {
-        "CronExpression": "*/5 * * * * ?",
-        "ApiUrl": "http://192.168.1.2/status.xml?pl1=1",
-        "LaneId": 1,
-        "ApiDownBehavior": "UseHistoric"
-      },
-      "Barrier2": {
-        "CronExpression": "*/7 * * * * ?",
-        "ApiUrl": "http://192.168.1.2/status.xml?pl2=1",
-        "LaneId": 2,
-        "ApiDownBehavior": "DontOpen"
-      },
-      "Barrier3": {
-        "CronExpression": "*/5 * * * * ?",
-        "ApiUrl": "http://192.168.1.2/status.xml?pl2=1",
-        "LaneId": 3,
-        "ApiDownBehavior": "OpenAny"
-      }
-    }
-  },
-  "NumberPlatesApiUrl": "https://api.example.com/numberplates",
-  "NumberPlatesCronExpression": "0 0 * * * ?",
-  "StartOpenOnLaunch": false
-}
-```
-
-### API Down Behaviors (Per Barrier)
-
-- **UseHistoric**: Continue using previously fetched number plate data
-- **DontOpen**: Clear number plate data, don't open barriers for any vehicles
-- **OpenAny**: Allow all vehicles to pass (bypass validation)
-
-Each barrier can have its own ApiDownBehavior configured independently.
-
-## Operation Flow
-
-### Automatic Mode (Cron Jobs)
-
-1. **Barrier Pulse Jobs**: Run on configured cron schedules
-2. **Number Plate Fetch Job**: Runs hourly by default
-3. **Transaction Processing**:
-   - Fetch next unprocessed transaction for the barrier's lane
-   - Check if transaction is "In" direction (Direction = 1)
-   - Validate number plate against authorized list and date/time range using the barrier's ApiDownBehavior
-   - Send pulse to barrier hardware if valid
-
-### Manual Mode
-
-- **Fetch Number Plates**: Button to manually trigger API data fetch
-- **Send Pulse**: Individual barrier control buttons
-
-### Flow Diagram
-
-```mermaid
-graph TD
-    A[Start Cron Job for Barrier] --> B[Get Next Unprocessed Transaction]
-    B --> C{Transaction Exists?}
-    C -->|No| D[Log: No pending transactions, skip pulse]
-    C -->|Yes| E[Update Last Processed Date]
-    E --> F{Is Direction 'In' (1)?}
-    F -->|No (Out)| G[Log: Out transaction, send pulse]
-    F -->|Yes| H[Get Barrier's ApiDownBehavior]
-    H --> I{ApiDownBehavior?}
-    I -->|OpenAny| G
-    I -->|DontOpen| J[Log: DontOpen mode, skip pulse]
-    I -->|UseHistoric| K[Is AllowAnyPlate?]
-    K -->|Yes| G
-    K -->|No| L[Validate Plate: IsValidPlate?]
-    L -->|Yes| G
-    L -->|No| M[Get Validation Reason]
-    M --> N[Log: Invalid plate with reason, skip pulse]
-    G --> O[Send Pulse to Barrier API]
-    O --> P{Success?}
-    P -->|Yes| Q[Log: Pulse sent successfully<br/>Set Indicator Green]
-    P -->|No| R[Log: Pulse failed<br/>Set Indicator Red]
-    Q --> S[Mark Transaction as Sent]
-    R --> S
-    S --> T[End Job]
-    D --> T
-    J --> T
-    N --> T
-```
-
-## Database Schema
-
-### Transactions Table
-
-```sql
-CREATE TABLE transactions (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    created DATETIME NOT NULL,
-    datetime DATETIME NOT NULL,
-    ocr_plate TEXT NOT NULL,
-    ocr_accuracy INTEGER NOT NULL,
-    direction INTEGER NOT NULL,  -- 0=Out, 1=In
-    lane_id INTEGER NOT NULL,
-    camera_id INTEGER NOT NULL,
-    image1 TEXT,
-    image2 TEXT,
-    image3 TEXT,
-    sent INTEGER NOT NULL DEFAULT 0,
-    sent_datetime DATETIME
-);
-```
-
-## API Endpoints
-
-### Number Plates API
-
-**URL**: Configurable via `NumberPlatesApiUrl`
-
-**Method**: GET
-
-**Response**: JSON array of number plate entries
-
-```json
-[
-  {
-    "plate": "ABC123",
-    "start": "2025-09-23T10:00:00",
-    "finish": "2025-09-23T18:00:00"
-  }
-]
-```
-
-### Barrier Control API
-
-**URL**: Configurable per barrier via `ApiUrl`
-
-**Method**: POST
-
-**Purpose**: Send pulse signal to physical barrier hardware
-
-## Scheduling
-
-Uses Quartz.NET for job scheduling with cron expressions:
-
-- Barrier jobs: Individual cron schedules per barrier
-- Number plate fetch: Hourly by default ("0 0 \* \* \* ?")
-
-## UI Components
-
-- **Barrier Controls**: Enable/disable toggles and manual pulse buttons
-- **Number Plate Fetch**: Manual data refresh button
-- **Log Console**: Real-time operation logging with auto-scroll
-- **Status Indicators**: Visual feedback for barrier states
-- **System Tray**: Minimizes to system tray on close, with right-click menu for Show, Settings, and Exit
-- **Settings Window**: Read-only viewer of all configuration settings with red highlighting for unset/empty values
 
 ## Dependencies
 
@@ -283,51 +60,22 @@ Uses Quartz.NET for job scheduling with cron expressions:
 - **Quartz.NET**: Job scheduling
 - **Microsoft.Data.Sqlite**: Database operations
 - **Microsoft.Extensions.Configuration**: Configuration management
+- **Polly**: Retry and resilience policies
 
 ## Building and Running
 
-1. Restore NuGet packages
-2. Build the project
-3. Run the application
-4. Configure `appsettings.json` as needed
-5. The app will initialize the database and start scheduled jobs
+1. Restore NuGet packages: `dotnet restore`
+2. Build the project: `dotnet build`
+3. Run the application: `dotnet run`
+4. Configure `appsettings.json`
+5. Test with: `./test-camera.ps1`
 
-## Sample Data
+## State Management
 
-The application includes 25 sample transactions for testing:
+Cline provides **Checkpoints** to save current project state (open files, configuration) for resuming sessions:
 
-- Mixed directions (In/Out)
-- Various lanes and cameras
-- Realistic timestamps and number plates
+- **Save**: Use the "Checkpoint" button to save a named snapshot
+- **Load**: Restore previous development state
+- **Persistence**: Survives restarts/reinstalls
 
-## Logging
-
-All operations are logged to the UI console with timestamps:
-
-- API fetch results
-- Transaction processing
-- Barrier operations
-- Error conditions
-- Detailed invalid plate reasons (e.g., "Plate 'ABC123' not found in authorized list")
-
-## Error Handling
-
-- API failures with configurable fallback modes (per barrier)
-- Database connection issues
-- Invalid configurations
-- Network timeouts
-
-## Security Considerations
-
-- API URLs should use HTTPS in production
-- Validate API responses for expected formats
-- Consider authentication for API endpoints
-- Secure database file access
-
-## Future Enhancements
-
-- User authentication and authorization
-- Advanced reporting and analytics
-- Integration with more camera systems
-- Mobile companion app
-- Cloud synchronization
+Checkpoints are recommended for preserving complex project states between sessions.
