@@ -18,22 +18,24 @@ namespace Ava
             IOptionsMonitor<AuthenticationSchemeOptions> options,
             ILoggerFactory logger,
             UrlEncoder encoder,
-            ISystemClock clock,
+            ISystemClock systemClock,
             Config config)
-            : base(options, logger, encoder, clock)
+            : base(options, logger, encoder, systemClock)
         {
             _config = config;
         }
 
+#pragma warning disable CS1998 // Async method lacks 'await' operators and will run synchronously
         protected override async Task<AuthenticateResult> HandleAuthenticateAsync()
+#pragma warning restore CS1998
         {
             if (!Request.Headers.ContainsKey("Authorization"))
                 return AuthenticateResult.Fail("Missing Authorization Header");
 
             try
             {
-                var authHeader = AuthenticationHeaderValue.Parse(Request.Headers["Authorization"]);
-                var credentialBytes = Convert.FromBase64String(authHeader.Parameter);
+                    var authHeader = AuthenticationHeaderValue.Parse(Request.Headers["Authorization"]!);
+                    var credentialBytes = Convert.FromBase64String(authHeader.Parameter!);
                 var credentials = Encoding.UTF8.GetString(credentialBytes).Split(new[] { ':' }, 2);
                 var username = credentials[0];
                 var password = credentials[1];

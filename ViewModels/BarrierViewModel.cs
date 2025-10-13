@@ -124,7 +124,7 @@ namespace Ava.ViewModels
             }
         }
 
-        public async Task<bool> SendPulseAsync(bool isCron = false)
+        public async Task<bool> SendPulseAsync(bool isCron = false, string pulseSource = "Manual")
         {
             await _pulseSemaphore.WaitAsync();
             try
@@ -173,14 +173,12 @@ namespace Ava.ViewModels
                 if (success)
                 {
                     IndicatorColor = Brushes.Green; // Green for working
-                    var pulseType = isCron ? "Cron" : "Manual";
-                    _loggingService.LogWithColor($"{pulseType} pulse sent successfully for {Name}", Colors.Green);
+                    _loggingService.LogWithColor($"{pulseSource} pulse sent successfully for {Name}", Colors.Green);
                 }
                 else
                 {
                     IndicatorColor = Brushes.Red; // Red for error
-                    var pulseType = isCron ? "Cron" : "Manual";
-                    _loggingService.LogWithColor($"{pulseType} pulse failed for {Name}", Colors.Red);
+                    _loggingService.LogWithColor($"{pulseSource} pulse failed for {Name}", Colors.Red);
                 }
 
                 // Update API status after pulse

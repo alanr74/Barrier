@@ -8,6 +8,8 @@ namespace Ava;
 
 public partial class SettingsWindow : ReactiveWindow<SettingsViewModel>
 {
+    public SettingsWindow() { }
+
     public SettingsWindow(AppConfig config)
     {
         InitializeComponent();

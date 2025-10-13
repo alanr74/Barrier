@@ -8,8 +8,9 @@ namespace Ava.Repositories
     public interface ITransactionRepository
     {
         void InitializeDatabase();
-        List<Transaction> GetAllTransactions();
         Transaction? GetNextTransaction(int laneId, DateTime lastProcessed);
+        List<Transaction> GetAllTransactions();
         Task AddCameraDataAsync(CameraMessage message);
+        Task MarkTransactionSentDirectly(CameraMessage message, int barrierLaneId);
     }
 }

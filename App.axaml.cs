@@ -173,7 +173,8 @@ public partial class App : Application
                 mainWindow.Icon = _amberIcon;
 
                 // Subscribe to status changes
-                var vm = mainWindow.DataContext as MainWindowViewModel;
+            var vm = mainWindow.DataContext as MainWindowViewModel;
+#pragma warning disable CS8602 // Dereference of a possibly null reference. - vm is checked for null below
                 if (vm != null)
                 {
                     vm.PropertyChanged += (s, e) =>

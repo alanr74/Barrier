@@ -7,7 +7,9 @@ using System.Threading.Tasks;
 
 class TestServer
 {
+#pragma warning disable CS8892 // Method 'TestServer.Main(string[])' will not be used as an entry point because a synchronous entry point 'Program.Main(string[])' was found.
     public static async Task Main(string[] args)
+#pragma warning restore CS8892
     {
         var builder = WebApplication.CreateBuilder(args);
 

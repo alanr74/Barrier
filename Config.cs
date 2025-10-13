@@ -24,6 +24,7 @@ namespace Ava
         public string ApiPassword { get; set; } = "secret";
         public string DatabasePath { get; set; } = "sync.db";
         public string DatabaseInitMode { get; set; } = "keep"; // "keep" or "recreate"
+        public string PulseTriggerMode { get; set; } = "db"; // "db" or "camera"
         public string LogFilePath { get; set; } = string.Empty;
         public string BarrierIpAddress { get; set; } = string.Empty;
         public int BarrierPort { get; set; }

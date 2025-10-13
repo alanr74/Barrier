@@ -155,10 +155,10 @@ namespace Ava.Repositories
             // Transform camera data to transaction format
             var transaction = new Transaction
             {
-                Created = DateTime.UtcNow,
+                Created = DateTime.Now, // Use local time to match cron processing
                 // Use FirstSeenWallClock if available, otherwise Current timestamp
                 DateTime = string.IsNullOrEmpty(message.FirstSeenWallClock) ?
-                          DateTime.UtcNow :
+                          DateTime.Now :
                           DateTime.Parse(message.FirstSeenWallClock),
                 OcrPlate = message.Vrm ?? string.Empty,
                 // Parse confidence as integer, default to 100 if invalid
@@ -202,6 +202,29 @@ namespace Ava.Repositories
             command.Parameters.AddWithValue("$image3", transaction.Image3 ?? (object)DBNull.Value);
             command.Parameters.AddWithValue("$sent", transaction.Sent);
             command.Parameters.AddWithValue("$sent_datetime", transaction.SentDateTime);
+
+            await command.ExecuteNonQueryAsync();
+        }
+
+        public async Task MarkTransactionSentDirectly(CameraMessage message, int barrierLaneId)
+        {
+            using var connection = new SqliteConnection(ConnectionString);
+            await connection.OpenAsync();
+
+            // Find the most recently inserted transaction for this camera message
+            // Since we just inserted it, find by most recent created with matching VRM and lane
+            var command = connection.CreateCommand();
+            command.CommandText = @"
+                UPDATE transactions
+                SET sent = 1, sent_datetime = $sent_datetime
+                WHERE lane_id = $lane_id AND ocr_plate = $ocr_plate AND sent = 0
+                ORDER BY created DESC
+                LIMIT 1;
+            ";
+
+            command.Parameters.AddWithValue("$lane_id", barrierLaneId);
+            command.Parameters.AddWithValue("$ocr_plate", message.Vrm ?? string.Empty);
+            command.Parameters.AddWithValue("$sent_datetime", DateTime.Now);
 
             await command.ExecuteNonQueryAsync();
         }
