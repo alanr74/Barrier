@@ -1,8 +1,0 @@
-F:\Dev\Ava\obj\Debug\net9.0\Ava.csproj.AssemblyReference.cache
-F:\Dev\Ava\obj\Debug\net9.0\Avalonia\Resources.Inputs.cache
-F:\Dev\Ava\obj\Debug\net9.0\Avalonia\resources
-F:\Dev\Ava\obj\Debug\net9.0\Ava.GeneratedMSBuildEditorConfig.editorconfig
-F:\Dev\Ava\obj\Debug\net9.0\Ava.AssemblyInfoInputs.cache
-F:\Dev\Ava\obj\Debug\net9.0\Ava.AssemblyInfo.cs
-F:\Dev\Ava\obj\Debug\net9.0\Ava.csproj.CoreCompileInputs.cache
-F:\Dev\Ava\obj\Debug\net9.0\Ava.sourcelink.json
