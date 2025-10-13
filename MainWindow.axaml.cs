@@ -28,7 +28,8 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
 
         // Create services (in a real app, use DI container)
         var httpClient = new HttpClient();
-        var transactionRepository = new TransactionRepository();
+        var serviceConfig = new Config();
+        var transactionRepository = new TransactionRepository(serviceConfig);
         var loggingService = new LoggingService();
         var barrierService = new BarrierService(httpClient, loggingService);
         var numberPlateService = new NumberPlateService(httpClient, loggingService, appConfig.NumberPlatesApiUrl, appConfig.WhitelistIds!);

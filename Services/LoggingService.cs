@@ -12,7 +12,7 @@ namespace Ava.Services
         public Action<string, Color>? LogWithColorAction { get; set; }
         public Action? ScrollAction { get; set; }
 
-    private Color AdjustColorForTheme(Color color)
+        private Color AdjustColorForTheme(Color color)
     {
         if (Application.Current?.RequestedThemeVariant == ThemeVariant.Dark)
         {
@@ -36,22 +36,44 @@ namespace Ava.Services
 
         public void Log(string message)
         {
-            Dispatcher.UIThread.InvokeAsync(() =>
+            // Always write to console for debugging/headless mode
+            Console.WriteLine($"{DateTime.Now}: {message}");
+
+            try
             {
-                var adjustedColor = AdjustColorForTheme(Colors.White);
-                LogWithColorAction?.Invoke($"{DateTime.Now}: {message}", adjustedColor);
-                ScrollAction?.Invoke();
-            });
+                Dispatcher.UIThread.InvokeAsync(() =>
+                {
+                    var adjustedColor = AdjustColorForTheme(Colors.White);
+                    LogWithColorAction?.Invoke($"{DateTime.Now}: {message}", adjustedColor);
+                    ScrollAction?.Invoke();
+                });
+            }
+            catch (Exception ex)
+            {
+                // UI might not be available in headless mode
+                Console.WriteLine($"UI logging failed (headless?): {ex.Message}");
+            }
         }
 
         public void LogWithColor(string message, Color color)
         {
-            Dispatcher.UIThread.InvokeAsync(() =>
+            // Always write to console for debugging/headless mode
+            Console.WriteLine($"{DateTime.Now}: {message}");
+
+            try
             {
-                var adjustedColor = AdjustColorForTheme(color);
-                LogWithColorAction?.Invoke($"{DateTime.Now}: {message}", adjustedColor);
-                ScrollAction?.Invoke();
-            });
+                Dispatcher.UIThread.InvokeAsync(() =>
+                {
+                    var adjustedColor = AdjustColorForTheme(color);
+                    LogWithColorAction?.Invoke($"{DateTime.Now}: {message}", adjustedColor);
+                    ScrollAction?.Invoke();
+                });
+            }
+            catch (Exception ex)
+            {
+                // UI might not be available in headless mode
+                Console.WriteLine($"UI logging failed (headless?): {ex.Message}");
+            }
         }
     }
 }

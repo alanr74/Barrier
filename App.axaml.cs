@@ -10,6 +10,7 @@ using System.IO;
 using Ava.ViewModels;
 using SkiaSharp;
 using Microsoft.Extensions.Configuration;
+using System;
 
 namespace Ava;
 
@@ -99,98 +100,98 @@ public partial class App : Application
     public override void Initialize()
     {
         AvaloniaXamlLoader.Load(this);
-    }
-
-    public override void OnFrameworkInitializationCompleted()
-    {
-        if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
-        {
-            // Read config
-            var config = new ConfigurationBuilder()
-                .SetBasePath(Directory.GetCurrentDirectory())
-                .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true)
-                .Build();
-
-            _appConfig = config.Get<Ava.AppConfig>() ?? new AppConfig();
-
-            // Set initial theme
-            SetTheme(_appConfig.ScreenMode);
-
-            var mainWindow = new MainWindow();
-            desktop.MainWindow = mainWindow;
-
-            // Create tray icon
-            _trayIcon = new TrayIcon
-            {
-                Icon = null, // Use default icon
-                ToolTipText = "Barrier Control System",
-                IsVisible = true
-            };
-
-            var showMenuItem = new NativeMenuItem("Show");
-            showMenuItem.Click += (s, e) =>
-            {
-                mainWindow.Show();
-                mainWindow.WindowState = WindowState.Normal;
-                mainWindow.Activate();
-            };
-
-            var settingsMenuItem = new NativeMenuItem("Settings");
-            settingsMenuItem.Click += (s, e) =>
-            {
-                var settingsWindow = new SettingsWindow(_appConfig);
-                settingsWindow.Show();
-            };
-
-            var exitMenuItem = new NativeMenuItem("Exit");
-            exitMenuItem.Click += (s, e) =>
-            {
-                desktop.Shutdown();
-            };
-
-            _trayIcon.Clicked += (s, e) =>
-            {
-                mainWindow.Show();
-                mainWindow.WindowState = WindowState.Normal;
-                mainWindow.Activate();
-            };
-
-            _trayIcon.Menu = new NativeMenu
-            {
-                Items = { showMenuItem, settingsMenuItem, exitMenuItem }
-            };
-
-            // Create icons
-            _greenIcon = CreateTrayIcon(Colors.Green);
-            _amberIcon = CreateTrayIcon(Colors.Orange);
-            _redIcon = CreateTrayIcon(Colors.Red);
-
-            // Set initial icon
-            _trayIcon.Icon = _amberIcon;
-            mainWindow.Icon = _amberIcon;
-
-            // Subscribe to status changes
-            var vm = mainWindow.DataContext as MainWindowViewModel;
-            if (vm != null)
-            {
-                vm.PropertyChanged += (s, e) =>
-                {
-                    if (e.PropertyName == "OverallStatus")
-                    {
-                        UpdateTrayIcon();
-                    }
-                };
-            }
-
-            // Start minimized to tray if not set to start open
-            if (!_appConfig.StartOpenOnLaunch)
-            {
-                mainWindow.WindowState = WindowState.Minimized;
-                mainWindow.ShowInTaskbar = false;
-                mainWindow.Hide();
-            }
         }
 
-        base.OnFrameworkInitializationCompleted();
-    }
+        public override void OnFrameworkInitializationCompleted()
+        {
+            if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
+            {
+                // Read config
+                var config = new ConfigurationBuilder()
+                    .SetBasePath(Directory.GetCurrentDirectory())
+                    .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true)
+                    .Build();
+
+                _appConfig = config.Get<Ava.AppConfig>() ?? new AppConfig();
+
+                // Set initial theme
+                SetTheme(_appConfig.ScreenMode);
+
+                var mainWindow = new MainWindow();
+                desktop.MainWindow = mainWindow;
+
+                // Create tray icon
+                _trayIcon = new TrayIcon
+                {
+                    Icon = null, // Use default icon
+                    ToolTipText = "Barrier Control System",
+                    IsVisible = true
+                };
+
+                var showMenuItem = new NativeMenuItem("Show");
+                showMenuItem.Click += (s, e) =>
+                {
+                    mainWindow.Show();
+                    mainWindow.WindowState = WindowState.Normal;
+                    mainWindow.Activate();
+                };
+
+                var settingsMenuItem = new NativeMenuItem("Settings");
+                settingsMenuItem.Click += (s, e) =>
+                {
+                    var settingsWindow = new SettingsWindow(_appConfig);
+                    settingsWindow.Show();
+                };
+
+                var exitMenuItem = new NativeMenuItem("Exit");
+                exitMenuItem.Click += (s, e) =>
+                {
+                    // Clean shutdown: dispose tray icon and shutdown
+                    _trayIcon?.Dispose();
+                    desktop.Shutdown();
+                };
+
+                _trayIcon.Clicked += (s, e) =>
+                {
+                    mainWindow.Show();
+                    mainWindow.WindowState = WindowState.Normal;
+                    mainWindow.Activate();
+                };
+
+                _trayIcon.Menu = new NativeMenu
+                {
+                    Items = { showMenuItem, settingsMenuItem, exitMenuItem }
+                };
+
+                // Create icons
+                _greenIcon = CreateTrayIcon(Colors.Green);
+                _amberIcon = CreateTrayIcon(Colors.Orange);
+                _redIcon = CreateTrayIcon(Colors.Red);
+
+                // Set initial icon
+                _trayIcon.Icon = _amberIcon;
+                mainWindow.Icon = _amberIcon;
+
+                // Subscribe to status changes
+                var vm = mainWindow.DataContext as MainWindowViewModel;
+                if (vm != null)
+                {
+                    vm.PropertyChanged += (s, e) =>
+                    {
+                        if (e.PropertyName == "OverallStatus")
+                        {
+                            UpdateTrayIcon();
+                        }
+                    };
+                }
+
+                // Start minimized to tray if not set to start open
+                if (!_appConfig.StartOpenOnLaunch)
+                {
+                    mainWindow.WindowState = WindowState.Minimized;
+                    mainWindow.ShowInTaskbar = false;
+                    mainWindow.Hide();
+                }
+            }
+        }
 }

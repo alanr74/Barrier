@@ -233,7 +233,14 @@ namespace Ava.ViewModels
         private async void InitializeApplication()
         {
             TransactionRepository.InitializeDatabase();
-            TransactionRepository.InsertSampleData();
+            // No longer inserting sample data - database starts empty
+
+            AppDomain.CurrentDomain.ProcessExit += (s, e) =>
+            {
+                // Gracefully stop scheduling service on exit
+                SchedulingService?.StopAsync().GetAwaiter().GetResult();
+            };
+
             await SchedulingService.StartAsync();
 
             LoggingService.Log($"AutostartNumberPlates config: {_autostartNumberPlates}");
@@ -256,16 +263,16 @@ namespace Ava.ViewModels
                         var success = await barrier.SendPulseAsync(false);
                         if (success)
                         {
-                            LoggingService.LogWithColor($"Initial pulse sent successfully for {barrier.Name}", Colors.Green);
+                            LoggingService.LogWithColor($"Initial pulse sent successfully for {barrier.Name}", Avalonia.Media.Colors.Green);
                         }
                         else
                         {
-                            LoggingService.LogWithColor($"Initial pulse failed for {barrier.Name}", Colors.Red);
+                            LoggingService.LogWithColor($"Initial pulse failed for {barrier.Name}", Avalonia.Media.Colors.Red);
                         }
                     }
-                    catch (Exception ex)
+                    catch (System.Exception ex)
                     {
-                        LoggingService.LogWithColor($"Initial pulse error for {barrier.Name}: {ex.Message}", Colors.Red);
+                        LoggingService.LogWithColor($"Initial pulse error for {barrier.Name}: {ex.Message}", Avalonia.Media.Colors.Red);
                     }
                 }
             }
