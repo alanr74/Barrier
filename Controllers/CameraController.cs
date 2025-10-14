@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using System.Collections.Generic;
 using System.Linq;
 using System;
+using Ava;
 using Avalonia.Media;
 
 namespace Ava.Controllers
@@ -70,23 +71,43 @@ namespace Ava.Controllers
         {
             try
             {
-                // Get the camera serial and determine lane (default to 1 for now)
-                int cameraId = int.TryParse(message.CameraSerial, out var id) ? id : 1;
-
                 // Access the current main window view model via static instance
                 var vm = MainWindowViewModel.Instance;
                 if (vm == null) return;
 
-                // Find the barrier that handles this lane (for now, assume lane = cameraId or default to 1)
-                var barrierLaneId = 1; // Default, could be mapped from cameraId in future
+                // Find the barrier by matching camera serial to barrier's CameraSerial
+                BarrierViewModel? targetBarrier = null;
+                int mappedLaneId = 1; // Default if no match
 
-                var availableBarriers = vm.Barriers;
-                var targetBarrier = availableBarriers?.FirstOrDefault(b => b.LaneId == barrierLaneId);
+                foreach (var barrier in vm.Barriers)
+                {
+                    if (barrier.BarrierConfig?.CameraSerial == (message.CameraSerial ?? string.Empty))
+                    {
+                        targetBarrier = barrier;
+                        mappedLaneId = barrier.LaneId;
+                        break;
+                    }
+                }
+
+                // If no match, use first enabled barrier and default lane to maintain backward compatibility
+                if (targetBarrier == null)
+                {
+                    targetBarrier = vm.Barriers.FirstOrDefault(b => b.IsEnabled);
+                    mappedLaneId = 1;
+                    if (message.CameraSerial != null)
+                    {
+                        _loggingService.LogWithColor($"No barrier found for camera serial '{message.CameraSerial}', using first enabled barrier (lane {mappedLaneId})", Avalonia.Media.Colors.Orange);
+                    }
+                }
 
                 if (targetBarrier != null && targetBarrier.IsEnabled)
                 {
+                    // Insert transaction with mapped lane and direction
+                    var direction = string.IsNullOrWhiteSpace(message.LogicalDirection) ? targetBarrier.BarrierConfig?.Direction ?? 0 : (message.LogicalDirection == "1" ? 1 : 0);
+                    await _transactionRepository.AddCameraDataAsync(message, mappedLaneId, direction);
+
                     // Get the transaction we just inserted for validation
-                    var transaction = await GetRecentlyInsertedTransaction(message, barrierLaneId);
+                    var transaction = await GetRecentlyInsertedTransaction(message, mappedLaneId, direction);
 
                     if (transaction == null)
                     {
@@ -96,16 +117,16 @@ namespace Ava.Controllers
 
                     // Validate the plate based on direction and barrier's ApiDownBehavior
                     bool shouldPulse = false;
-                    if (transaction.Direction == 1) // Inbound
+                    if (direction == 1) // Inbound
                     {
-                        if (MainWindowViewModel.Instance?.NumberPlateService.IsValidPlate(transaction.OcrPlate, transaction.Direction, targetBarrier.ApiDownBehavior) == true)
+                        if (MainWindowViewModel.Instance?.NumberPlateService.IsValidPlate(transaction.OcrPlate, direction, targetBarrier.ApiDownBehavior) == true)
                         {
                             _loggingService.LogWithColor($"Valid camera transaction for plate '{transaction.OcrPlate}', triggering camera pulse for {targetBarrier.Name}", Avalonia.Media.Colors.Green);
                             shouldPulse = true;
                         }
                         else
                         {
-                            var reason = MainWindowViewModel.Instance?.NumberPlateService.GetValidationReason(transaction.OcrPlate, transaction.Direction, targetBarrier.ApiDownBehavior);
+                            var reason = MainWindowViewModel.Instance?.NumberPlateService.GetValidationReason(transaction.OcrPlate, direction, targetBarrier.ApiDownBehavior);
                             _loggingService.LogWithColor($"Invalid plate '{transaction.OcrPlate}' for camera In transaction on {targetBarrier.Name}, skipping pulse. Reason: {reason ?? "Unknown validation error"}", Avalonia.Media.Colors.Red);
                         }
                     }
@@ -121,7 +142,7 @@ namespace Ava.Controllers
 
                         if (success)
                         {
-                            await _transactionRepository.MarkTransactionSentDirectly(message, barrierLaneId);
+                            await _transactionRepository.MarkTransactionSentDirectly(message, mappedLaneId);
                             _loggingService.LogWithColor($"Camera pulse sent successfully for {targetBarrier.Name}", Avalonia.Media.Colors.Green);
                         }
                         else
@@ -137,7 +158,7 @@ namespace Ava.Controllers
             }
         }
 
-        private async Task<Models.Transaction?> GetRecentlyInsertedTransaction(CameraMessage message, int barrierLaneId)
+        private async Task<Models.Transaction?> GetRecentlyInsertedTransaction(CameraMessage message, int barrierLaneId, int direction)
         {
             // This is a simple implementation; in production, could use a callback or queue
             await Task.Delay(100); // Small delay to ensure insert is complete

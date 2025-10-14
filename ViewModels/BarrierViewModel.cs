@@ -26,6 +26,7 @@ namespace Ava.ViewModels
         public int LaneId { get; }
         public string ApiDownBehavior { get; }
         public DateTime LastProcessedDate { get; set; } = DateTime.MinValue;
+        public BarrierConfig? BarrierConfig { get; set; }
 
         private readonly IBarrierService _barrierService;
         private readonly ILoggingService _loggingService;

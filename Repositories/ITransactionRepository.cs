@@ -11,6 +11,7 @@ namespace Ava.Repositories
         Transaction? GetNextTransaction(int laneId, DateTime lastProcessed);
         List<Transaction> GetAllTransactions();
         Task AddCameraDataAsync(CameraMessage message);
+        Task AddCameraDataAsync(CameraMessage message, int laneId, int direction);
         Task MarkTransactionSentDirectly(CameraMessage message, int barrierLaneId);
     }
 }

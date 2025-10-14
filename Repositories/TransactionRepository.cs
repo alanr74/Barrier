@@ -148,6 +148,11 @@ namespace Ava.Repositories
 
         public async Task AddCameraDataAsync(CameraMessage message)
         {
+            await AddCameraDataAsync(message, 1, !string.IsNullOrWhiteSpace(message.LogicalDirection) && message.LogicalDirection == "1" ? 1 : 0);
+        }
+
+        public async Task AddCameraDataAsync(CameraMessage message, int laneId, int direction)
+        {
             // Transform camera message to transaction and insert into existing transactions table
             using var connection = new SqliteConnection(ConnectionString);
             await connection.OpenAsync();
@@ -163,10 +168,10 @@ namespace Ava.Repositories
                 OcrPlate = message.Vrm ?? string.Empty,
                 // Parse confidence as integer, default to 100 if invalid
                 OcrAccuracy = int.TryParse(message.Confidence, out var accuracy) ? accuracy : 100,
-                // Parse logical direction as integer
-                Direction = !string.IsNullOrWhiteSpace(message.LogicalDirection) && message.LogicalDirection == "1" ? 1 : 0,
-                // Default lane ID since not in camera data
-                LaneId = 1,
+                // Use provided direction from caller
+                Direction = direction,
+                // Use provided lane ID
+                LaneId = laneId,
                 // Parse camera serial as integer, default to 1
                 CameraId = int.TryParse(message.CameraSerial, out var cameraId) ? cameraId : 1,
                 // Take first 3 images from Images dictionary if available

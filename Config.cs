@@ -5,11 +5,14 @@ namespace Ava
 {
     public class BarrierConfig
     {
+        public string Name { get; set; } = string.Empty;
         public string CronExpression { get; set; } = string.Empty;
         public string ApiUrl { get; set; } = string.Empty;
         public int LaneId { get; set; }
         public string ApiDownBehavior { get; set; } = "UseHistoric";
         public bool IsEnabled { get; set; } = true;
+        public int Direction { get; set; } = 0;
+        public string CameraSerial { get; set; } = string.Empty;
     }
 
     public class BarriersConfig

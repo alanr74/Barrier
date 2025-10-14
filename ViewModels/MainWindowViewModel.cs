@@ -196,6 +196,7 @@ namespace Ava.ViewModels
                 if (appConfig.Barriers.Barriers.TryGetValue(barrierKey, out var barrierConfig))
                 {
                     var barrierVm = new BarrierViewModel(barrierKey, barrierConfig.CronExpression, barrierConfig.ApiUrl, barrierConfig.LaneId, barrierConfig.ApiDownBehavior, barrierConfig.IsEnabled, BarrierService, LoggingService, NumberPlateService, TransactionRepository, AppStartupTime);
+                    barrierVm.BarrierConfig = barrierConfig;
                     Barriers.Add(barrierVm);
                     if (performInitialApiStatusCheck)
                     {

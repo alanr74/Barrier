@@ -89,6 +89,9 @@ Each barrier (e.g., lane/gate) has settings below. Applies to all barriers in `B
 | `CronExpression` | `string` | `""` | Quartz cron for polling unsent DB transactions in "db" mode. E.g., `"*/5 * * * * ?"` (every 5 seconds). Disabled if `IsEnabled` is false. |
 | `ApiUrl` | `string` | `""` | HTTP endpoint for barrier pulsing (POST to trigger open). E.g., `"http://192.168.1.2/status.xml?pl1=1"`. Must support empty-body POST; used for status GETs. |
 | `LaneId` | `int` | `0` | Unique ID (1, 2, 3, ...) for DB matching (`lane_id` in `transactions`). Cameras/separate apps insert with matching IDs; cron only processes matching lanes. |
+| `Name` | `string` | `""` | Human-readable name for the barrier (e.g., "Main Entrance"). Displayed in logs and UI. |
+| `Direction` | `int` | `0` | Default direction for camera transactions when JSON payload lacks `LogicalDirection`: `0` (outbound/always validate), `1` (inbound/validate plates). |
+| `CameraSerial` | `string` | `""` | Serial identifier for the camera linked to this barrier (e.g., "CAM001"). Incoming camera data is routed to matching barrier. |
 | `ApiDownBehavior` | `string` | `"UseHistoric"` | Fallback when number plate API fails: `"UseHistoric"` (use cached plates), `"DontOpen"` (block all inbound), `"OpenAny"` (allow all inbound). |
 | `IsEnabled` | `bool` | `true` | Whether this barrier participates in cron scheduling (and startup pulses if enabled). Disabled barriers are created but skipped in jobs. |
 
