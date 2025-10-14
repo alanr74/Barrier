@@ -11,15 +11,25 @@ namespace Ava.Services
     {
         private readonly HttpClient _httpClient;
         private readonly ILoggingService _loggingService;
+        private readonly bool _debugMode;
+        private readonly bool _noRelayCalls;
 
-        public BarrierService(HttpClient httpClient, ILoggingService loggingService)
+        public BarrierService(HttpClient httpClient, ILoggingService loggingService, bool debugMode, bool noRelayCalls)
         {
             _httpClient = httpClient;
             _loggingService = loggingService;
+            _debugMode = debugMode;
+            _noRelayCalls = noRelayCalls;
         }
 
         public async Task<bool> SendPulseAsync(string apiUrl, string barrierName, int retryCount = 3)
         {
+            if (_debugMode || _noRelayCalls)
+            {
+                _loggingService.LogWithColor($"[DEBUG] Pulse would have been sent to {apiUrl} for {barrierName}", Colors.Green);
+                return true; // Simulate success to continue logic
+            }
+
             _loggingService.Log($"Sending pulse to {apiUrl} for {barrierName}");
             var retryPolicy = HttpPolicyExtensions
                 .HandleTransientHttpError()

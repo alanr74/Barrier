@@ -1,5 +1,7 @@
 using System;
 
+using System;
+
 namespace Ava.Models
 {
     public class Transaction
@@ -15,7 +17,7 @@ namespace Ava.Models
         public string? Image1 { get; set; }
         public string? Image2 { get; set; }
         public string? Image3 { get; set; }
-        public int Sent { get; set; }
-        public DateTime SentDateTime { get; set; }
+        public int Sent { get; set; } = 0;
+        public DateTime SentDateTime { get; set; } = DateTime.MinValue;
     }
 }

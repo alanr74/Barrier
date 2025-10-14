@@ -50,5 +50,7 @@ namespace Ava
         public bool AutostartNumberPlates { get; set; } = true;
         public bool StartOpenOnLaunch { get; set; } = false;
         public string ScreenMode { get; set; } = "System";
+        public bool DebugMode { get; set; } = false;
+        public bool NoRelayCalls { get; set; } = false;
     }
 }

@@ -133,10 +133,12 @@ namespace Ava.ViewModels
 
                 if (isCron && !IsEnabled) return false;
 
+                Transaction? transaction = null;
+
                 // For cron, get next transaction; for manual, don't read db
                 if (isCron)
                 {
-                    var transaction = _transactionRepository.GetNextTransaction(LaneId, LastProcessedDate);
+                    transaction = _transactionRepository.GetNextTransaction(LaneId, LastProcessedDate);
                     if (transaction != null)
                     {
                         LastNumberPlate = transaction.OcrPlate;

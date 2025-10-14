@@ -31,7 +31,7 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
         var serviceConfig = new Config();
         var transactionRepository = new TransactionRepository(serviceConfig);
         var loggingService = new LoggingService();
-        var barrierService = new BarrierService(httpClient, loggingService);
+        var barrierService = new BarrierService(httpClient, loggingService, appConfig.DebugMode, appConfig.NoRelayCalls);
         var numberPlateService = new NumberPlateService(httpClient, loggingService, appConfig.NumberPlatesApiUrl, appConfig.WhitelistCredentials);
         var schedulingService = new SchedulingService();
 
