@@ -55,5 +55,6 @@ namespace Ava
         public string ScreenMode { get; set; } = "System";
         public bool DebugMode { get; set; } = false;
         public bool NoRelayCalls { get; set; } = false;
+        public int DuplicateSuppressionWindowSeconds { get; set; } = 5;
     }
 }

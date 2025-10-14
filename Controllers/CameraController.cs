@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging;
 using Ava.Repositories;
 using Ava.Services;
 using Ava.ViewModels;
@@ -16,139 +17,315 @@ namespace Ava.Controllers
     [Route("api/[controller]")]
     public class CameraController : ControllerBase
     {
+        /// <summary>
+        /// Receives camera data for vehicle number plate detection and processes it for barrier control.
+        /// </summary>
+        /// <param name="data">JSON payload containing vehicle detection details, such as VRM, camera serial, and direction. Supports single or array format.</param>
+        /// <returns>Confirmation of successful data saving or error details.</returns>
+        /// <response code="200">Data saved successfully, returns count of processed messages.</response>
+        /// <response code="400">Bad request, likely malformed JSON or missing required fields.</response>
+        /// <response code="500">Internal server error during processing.</response>
         private readonly ITransactionRepository _transactionRepository;
         private readonly ILoggingService _loggingService;
         private readonly Config _config;
+        private readonly DuplicateSuppressorService _duplicateSuppressorService;
+        private readonly ILogger<CameraController> _logger;
 
-        public CameraController(ITransactionRepository transactionRepository, ILoggingService loggingService, Config config)
+        public CameraController(ITransactionRepository transactionRepository, ILoggingService loggingService, Config config, DuplicateSuppressorService duplicateSuppressorService, ILogger<CameraController> logger)
         {
             _transactionRepository = transactionRepository;
             _loggingService = loggingService;
             _config = config;
+            _duplicateSuppressorService = duplicateSuppressorService;
+            _logger = logger;
         }
 
+        /// <summary>
+        /// Test endpoint to verify API functionality.
+        /// </summary>
+        /// <returns>A success message.</returns>
+        /// <response code="200">API is working.</response>
+        [HttpGet("test")]
+        public IActionResult Test()
+        {
+            return Ok(new { success = true });
+        }
+
+        /// <summary>
+        /// Receives camera data for vehicle number plate detection and processes it for barrier control.
+        /// </summary>
+        /// <param name="data">JSON payload containing vehicle detection details, such as VRM, camera serial, and direction. Supports single or array format.</param>
+        /// <returns>Confirmation of successful data saving or error details.</returns>
+        /// <response code="200">Data saved successfully, returns count of processed messages.</response>
+        /// <response code="400">Bad request, likely malformed JSON or missing required fields.</response>
+        /// <response code="500">Internal server error during processing.</response>
+        /// <remarks>
+        /// ## Example Request Body
+        /// ```json
+        /// {
+        ///     "messageType": "readVrm",
+        ///     "cameraSerial": "CAM001",
+        ///     "vrm": "1SZ8903",
+        ///     "logicalDirection": "Unknown",
+        ///     "confidence": "0.59108752"
+        /// }
+        /// ```
+        /// </remarks>
         [HttpPost]
         public async Task<IActionResult> PostCameraData([FromBody] JsonElement data)
         {
+            Console.WriteLine("PostCameraData called");
+            Console.WriteLine("JSON root keys: " + string.Join(", ", data.EnumerateObject().Select(p => p.Name)));
+
             try
             {
                 if (data.TryGetProperty("vrmMessages", out var vrmMessages) && vrmMessages.ValueKind == JsonValueKind.Array)
                 {
                     // Handle multiple records
-                    var messages = JsonSerializer.Deserialize<List<CameraMessage>>(vrmMessages.GetRawText())!;
-                    foreach (var message in messages)
+                    var messages = new List<CameraMessage>();
+                    foreach (var item in vrmMessages.EnumerateArray())
                     {
-                        await _transactionRepository.AddCameraDataAsync(message);
-                        if (_config.PulseTriggerMode == "camera")
+                        var message = ParseCameraMessage(item);
+                        if (message != null)
                         {
-                            await TriggerBarrierValidationAndPulse(message);
+                            messages.Add(message);
+                        }
+                        else
+                        {
+                            _loggingService.LogWithColor("Failed to parse one of the messages in array", Avalonia.Media.Colors.Red);
                         }
                     }
-                    _loggingService.LogWithColor($"Camera data received: {messages.Count} records, first VRM: {messages.FirstOrDefault()?.Vrm}", Avalonia.Media.Colors.Green);
+                    int processedCount = 0;
+                    foreach (var message in messages)
+                    {
+                        try
+                        {
+                            if (await ProcessCameraMessage(message))
+                            {
+                                processedCount++;
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            _loggingService.LogWithColor($"Error processing message for VRM {message.Vrm}: {ex.Message}", Avalonia.Media.Colors.Red);
+                        }
+                    }
+                    _loggingService.LogWithColor($"Camera data received: {messages.Count} records, processed: {processedCount}", Avalonia.Media.Colors.Green);
                     return Ok(new { saved = true, count = messages.Count });
                 }
                 else
                 {
                     // Handle single record
-                    var message = JsonSerializer.Deserialize<CameraMessage>(data.GetRawText())!;
-                    await _transactionRepository.AddCameraDataAsync(message);
-                    if (_config.PulseTriggerMode == "camera")
+                    var message = ParseCameraMessage(data);
+                    if (message == null)
                     {
-                        await TriggerBarrierValidationAndPulse(message);
+                        Console.WriteLine("ParseCameraMessage returned null");
+                        _loggingService.LogWithColor("Failed to parse single camera message", Avalonia.Media.Colors.Red);
+                        _logger.LogError("Failed to parse JSON in ParseCameraMessage, returning 400");
+                        return BadRequest("Invalid JSON format for camera message");
                     }
-                    _loggingService.LogWithColor($"Camera data received: VRM {message.Vrm}", Avalonia.Media.Colors.Green);
+                    Console.WriteLine("Message parsed successfully: Vrm = " + message.Vrm + ", CameraSerial = " + message.CameraSerial);
+                    bool processed;
+                    try
+                    {
+                        processed = await ProcessCameraMessage(message);
+                    }
+                    catch (Exception ex)
+                    {
+                        _loggingService.LogWithColor($"Error processing message for VRM {message.Vrm}: {ex.Message}", Avalonia.Media.Colors.Red);
+                        _logger.LogError(ex, "Error in ProcessCameraMessage for VRM {Vrm}", message.Vrm);
+                        return BadRequest(new { error = ex.Message });
+                    }
+                    _loggingService.LogWithColor($"Camera data received: VRM {message.Vrm}, processed: {processed}", Avalonia.Media.Colors.Green);
                     return Ok(new { saved = true, count = 1 });
                 }
             }
             catch (System.Exception ex)
             {
                 _loggingService.LogWithColor($"Camera data save failed: {ex.Message}", Avalonia.Media.Colors.Red);
+                System.IO.Directory.CreateDirectory("logs");
+                System.IO.File.AppendAllText("logs/camera-errors.log", $"[{DateTime.Now}] Camera data save failed: {ex.Message}\n{ex.StackTrace}\n");
                 return BadRequest(new { error = ex.Message });
             }
         }
 
-        private async Task TriggerBarrierValidationAndPulse(CameraMessage message)
+        private CameraMessage? ParseCameraMessage(JsonElement element)
         {
             try
             {
-                // Access the current main window view model via static instance
-                var vm = MainWindowViewModel.Instance;
-                if (vm == null) return;
+                var message = new CameraMessage();
 
-                // Find the barrier by matching camera serial to barrier's CameraSerial
-                BarrierViewModel? targetBarrier = null;
-                int mappedLaneId = 1; // Default if no match
-
-                foreach (var barrier in vm.Barriers)
+                if (element.TryGetProperty("vrm", out var vrmProp) && vrmProp.ValueKind == JsonValueKind.String)
                 {
-                    if (barrier.BarrierConfig?.CameraSerial == (message.CameraSerial ?? string.Empty))
-                    {
-                        targetBarrier = barrier;
-                        mappedLaneId = barrier.LaneId;
-                        break;
-                    }
+                    message.Vrm = vrmProp.GetString();
                 }
 
-                // If no match, use first enabled barrier and default lane to maintain backward compatibility
-                if (targetBarrier == null)
+                if (element.TryGetProperty("cameraSerial", out var cameraSerialProp) && cameraSerialProp.ValueKind == JsonValueKind.String)
                 {
-                    targetBarrier = vm.Barriers.FirstOrDefault(b => b.IsEnabled);
-                    mappedLaneId = 1;
-                    if (message.CameraSerial != null)
-                    {
-                        _loggingService.LogWithColor($"No barrier found for camera serial '{message.CameraSerial}', using first enabled barrier (lane {mappedLaneId})", Avalonia.Media.Colors.Orange);
-                    }
+                    message.CameraSerial = cameraSerialProp.GetString();
                 }
 
-                if (targetBarrier != null && targetBarrier.IsEnabled)
+                if (element.TryGetProperty("logicalDirection", out var logicalDirectionProp) && logicalDirectionProp.ValueKind == JsonValueKind.String)
                 {
-                    // Insert transaction with mapped lane and direction
-                    var direction = string.IsNullOrWhiteSpace(message.LogicalDirection) ? targetBarrier.BarrierConfig?.Direction ?? 0 : (message.LogicalDirection == "1" ? 1 : 0);
-                    await _transactionRepository.AddCameraDataAsync(message, mappedLaneId, direction);
+                    message.LogicalDirection = logicalDirectionProp.GetString();
+                }
 
-                    // Get the transaction we just inserted for validation
-                    var transaction = await GetRecentlyInsertedTransaction(message, mappedLaneId, direction);
+                if (element.TryGetProperty("confidence", out var confidenceProp) && confidenceProp.ValueKind == JsonValueKind.String)
+                {
+                    message.Confidence = confidenceProp.GetString();
+                }
 
-                    if (transaction == null)
+                // Optional fields can be added here if needed
+                if (element.TryGetProperty("firstSeenWallClock", out var firstSeenProp) && firstSeenProp.ValueKind == JsonValueKind.String)
+                {
+                    message.FirstSeenWallClock = firstSeenProp.GetString();
+                }
+
+                if (element.TryGetProperty("direction", out var directionProp) && directionProp.ValueKind == JsonValueKind.String)
+                {
+                    message.Direction = directionProp.GetString();
+                }
+
+                if (element.TryGetProperty("images", out var imagesProp) && imagesProp.ValueKind == JsonValueKind.Object)
+                {
+                    var images = new Dictionary<string, string>();
+                    foreach (var prop in imagesProp.EnumerateObject())
                     {
-                        _loggingService.LogWithColor($"Failed to find transaction for validation in camera mode for {message.Vrm}", Avalonia.Media.Colors.Red);
-                        return;
-                    }
-
-                    // Validate the plate based on direction and barrier's ApiDownBehavior
-                    bool shouldPulse = false;
-                    if (direction == 1) // Inbound
-                    {
-                        if (MainWindowViewModel.Instance?.NumberPlateService.IsValidPlate(transaction.OcrPlate, direction, targetBarrier.ApiDownBehavior) == true)
+                        if (prop.Value.ValueKind == JsonValueKind.String)
                         {
-                            _loggingService.LogWithColor($"Valid camera transaction for plate '{transaction.OcrPlate}', triggering camera pulse for {targetBarrier.Name}", Avalonia.Media.Colors.Green);
-                            shouldPulse = true;
-                        }
-                        else
-                        {
-                            var reason = MainWindowViewModel.Instance?.NumberPlateService.GetValidationReason(transaction.OcrPlate, direction, targetBarrier.ApiDownBehavior);
-                            _loggingService.LogWithColor($"Invalid plate '{transaction.OcrPlate}' for camera In transaction on {targetBarrier.Name}, skipping pulse. Reason: {reason ?? "Unknown validation error"}", Avalonia.Media.Colors.Red);
+                            images[prop.Name] = prop.Value.GetString() ?? string.Empty;
                         }
                     }
-                    else // Outbound
+                    message.Images = images;
+                }
+
+                // Set other required fields to null or defaults
+                message.MessageType = null;
+                message.Exposure = null;
+                message.Gain = null;
+                message.CaptureTimeStamp = null;
+                message.ConfidenceOfPresence = null;
+                message.LastSeenWallClock = null;
+                message.ImageFormat = null;
+                message.PlatePosition = null;
+                message.CharacterHeight = null;
+                message.TrackingId = null;
+                message.IsNewVehicle = null;
+                message.Tracking = null;
+                message.IsPartial = null;
+                message.InstanceId = null;
+                message.Country = null;
+                message.CountryConfidence = null;
+                message.PatchImageIndex = null;
+                message.OverviewImageIndex = null;
+                message.PrimaryImageIndex = null;
+                message.CroppedPrimaryImageIndex = null;
+
+                return message;
+            }
+            catch (Exception ex)
+            {
+                System.IO.Directory.CreateDirectory("logs");
+                System.IO.File.AppendAllText("logs/camera-errors.log", $"[{DateTime.Now}] ParseCameraMessage error: {ex.Message}\n{ex.StackTrace}\n");
+                return null;
+            }
+        }
+
+        private async Task<bool> ProcessCameraMessage(CameraMessage message)
+        {
+            // Check for duplicates in memory first, even before processing
+            var vm = MainWindowViewModel.Instance;
+            if (vm == null) return false;
+
+            // Find the barrier by matching camera serial
+            BarrierViewModel? targetBarrier = null;
+            int mappedLaneId = 1;
+            foreach (var barrier in vm.Barriers)
+            {
+                if (barrier.BarrierConfig?.CameraSerial == (message.CameraSerial ?? string.Empty))
+                {
+                    targetBarrier = barrier;
+                    mappedLaneId = barrier.LaneId;
+                    break;
+                }
+            }
+            if (targetBarrier == null)
+            {
+                targetBarrier = vm.Barriers.FirstOrDefault(b => b.IsEnabled);
+                if (message.CameraSerial != null)
+                {
+                    _loggingService.LogWithColor($"No barrier found for camera serial '{message.CameraSerial}', using first enabled barrier", Avalonia.Media.Colors.Orange);
+                }
+            }
+
+            var direction = string.IsNullOrWhiteSpace(message.LogicalDirection) ? (targetBarrier?.BarrierConfig?.Direction ?? 0) : (message.LogicalDirection == "1" ? 1 : 0);
+
+            // Check for duplicates
+            if (_duplicateSuppressorService.IsDuplicate(message.Vrm ?? string.Empty, mappedLaneId, direction))
+            {
+                _loggingService.LogWithColor($"Duplicate VRM '{message.Vrm}' in lane {mappedLaneId} direction {direction} within suppression window, skipping", Avalonia.Media.Colors.Orange);
+                return false; // Not saved, but logged for visibility
+            }
+
+            await _transactionRepository.AddCameraDataAsync(message, mappedLaneId, direction);
+            if (_config.PulseTriggerMode == "camera")
+            {
+                await TriggerBarrierValidationAndPulse(message, targetBarrier!, mappedLaneId, direction);
+            }
+            return true;
+        }
+
+        private async Task TriggerBarrierValidationAndPulse(CameraMessage message, BarrierViewModel targetBarrier, int mappedLaneId, int direction)
+        {
+            if (targetBarrier == null || !targetBarrier.IsEnabled)
+            {
+                return;
+            }
+
+            try
+            {
+                // Get the transaction we just inserted for validation
+                var transaction = await GetRecentlyInsertedTransaction(message, mappedLaneId, direction);
+
+                if (transaction == null)
+                {
+                    _loggingService.LogWithColor($"Failed to find transaction for validation in camera mode for {message.Vrm}", Avalonia.Media.Colors.Red);
+                    return;
+                }
+
+                // Validate the plate based on direction and barrier's ApiDownBehavior
+                bool shouldPulse = false;
+                if (direction == 1) // Inbound
+                {
+                    if (MainWindowViewModel.Instance?.NumberPlateService.IsValidPlate(transaction.OcrPlate, direction, targetBarrier.ApiDownBehavior) == true)
                     {
-                        _loggingService.Log($"Camera Out transaction, triggering camera pulse for {targetBarrier.Name}");
+                        _loggingService.LogWithColor($"Valid camera transaction for plate '{transaction.OcrPlate}', triggering camera pulse for {targetBarrier.Name}", Avalonia.Media.Colors.Green);
                         shouldPulse = true;
                     }
-
-                    if (shouldPulse)
+                    else
                     {
-                        var success = await targetBarrier.SendPulseAsync(false, "Camera");
+                        var reason = MainWindowViewModel.Instance?.NumberPlateService.GetValidationReason(transaction.OcrPlate, direction, targetBarrier.ApiDownBehavior);
+                        _loggingService.LogWithColor($"Invalid plate '{transaction.OcrPlate}' for camera In transaction on {targetBarrier.Name}, skipping pulse. Reason: {reason ?? "Unknown validation error"}", Avalonia.Media.Colors.Red);
+                    }
+                }
+                else // Outbound
+                {
+                    _loggingService.Log($"Camera Out transaction, triggering camera pulse for {targetBarrier.Name}");
+                    shouldPulse = true;
+                }
 
-                        if (success)
-                        {
-                            await _transactionRepository.MarkTransactionSentDirectly(message, mappedLaneId);
-                            _loggingService.LogWithColor($"Camera pulse sent successfully for {targetBarrier.Name}", Avalonia.Media.Colors.Green);
-                        }
-                        else
-                        {
-                            _loggingService.LogWithColor($"Camera pulse failed for {targetBarrier.Name}", Avalonia.Media.Colors.Red);
-                        }
+                if (shouldPulse)
+                {
+                    var success = await targetBarrier.SendPulseAsync(false, "Camera");
+
+                    if (success)
+                    {
+                        await _transactionRepository.MarkTransactionSentDirectly(message, mappedLaneId);
+                        _loggingService.LogWithColor($"Camera pulse sent successfully for {targetBarrier.Name}", Avalonia.Media.Colors.Green);
+                    }
+                    else
+                    {
+                        _loggingService.LogWithColor($"Camera pulse failed for {targetBarrier.Name}", Avalonia.Media.Colors.Red);
                     }
                 }
             }

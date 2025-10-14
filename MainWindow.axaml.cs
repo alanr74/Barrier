@@ -33,6 +33,7 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
         var loggingService = new LoggingService();
         var barrierService = new BarrierService(httpClient, loggingService, appConfig.DebugMode, appConfig.NoRelayCalls);
         var numberPlateService = new NumberPlateService(httpClient, loggingService, appConfig.NumberPlatesApiUrl, appConfig.WhitelistCredentials);
+        var duplicateSuppressorService = new DuplicateSuppressorService(appConfig.DuplicateSuppressionWindowSeconds);
         var schedulingService = new SchedulingService();
 
         ViewModel = new Ava.ViewModels.MainWindowViewModel(
@@ -40,7 +41,8 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
             numberPlateService,
             barrierService,
             schedulingService,
-            loggingService);
+            loggingService,
+            duplicateSuppressorService);
 
         // Set logging actions
         loggingService.ScrollAction = () => { if (ViewModel.IsAutoScrollEnabled && ViewModel.LogEntries.Any()) LogListBox!.ScrollIntoView(ViewModel.LogEntries[^1]); };

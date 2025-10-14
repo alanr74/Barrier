@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Data;
 using System.Threading.Tasks;
 using System.Linq;
+using System.Globalization;
 using Microsoft.Data.Sqlite;
 using Ava.Models;
 
@@ -157,14 +158,25 @@ namespace Ava.Repositories
             using var connection = new SqliteConnection(ConnectionString);
             await connection.OpenAsync();
 
+            // Parse DateTime separately due to syntax constraints
+            DateTime dateTime;
+            try
+            {
+                dateTime = string.IsNullOrEmpty(message.FirstSeenWallClock) ?
+                           DateTime.Now :
+                           DateTime.TryParseExact(message.FirstSeenWallClock, "yyyyMMddHHmmssfff", CultureInfo.InvariantCulture, DateTimeStyles.None, out var parsedDate) ?
+                             parsedDate : DateTime.Now;
+            }
+            catch
+            {
+                dateTime = DateTime.Now;
+            }
+
             // Transform camera data to transaction format
             var transaction = new Transaction
             {
                 Created = DateTime.Now, // Use local time to match cron processing
-                // Use FirstSeenWallClock if available, otherwise Current timestamp
-                DateTime = string.IsNullOrEmpty(message.FirstSeenWallClock) ?
-                          DateTime.Now :
-                          DateTime.Parse(message.FirstSeenWallClock),
+                DateTime = dateTime,
                 OcrPlate = message.Vrm ?? string.Empty,
                 // Parse confidence as integer, default to 100 if invalid
                 OcrAccuracy = int.TryParse(message.Confidence, out var accuracy) ? accuracy : 100,

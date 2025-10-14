@@ -34,7 +34,7 @@ namespace Ava
         public string? CharacterHeight { get; set; }
         public string? TrackingId { get; set; }
         public string? IsNewVehicle { get; set; }
-        public List<Tracking>? Tracking { get; set; }
+        public object? Tracking { get; set; }
         public Dictionary<string, string>? Images { get; set; }
         public string? IsPartial { get; set; }
         public string? InstanceId { get; set; }

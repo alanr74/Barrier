@@ -126,7 +126,8 @@ namespace Ava.ViewModels
                 INumberPlateService numberPlateService,
                 IBarrierService barrierService,
                 ISchedulingService schedulingService,
-                ILoggingService loggingService)
+                ILoggingService loggingService,
+                DuplicateSuppressorService duplicateSuppressorService)
             {
                 AppStartupTime = DateTime.Now;
 

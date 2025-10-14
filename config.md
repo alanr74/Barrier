@@ -58,6 +58,7 @@ These settings control global application behavior, not tied to specific barrier
 | `DatabaseInitMode` | `string` | `"keep"` | DB table handling on startup: `"keep"` (preserve existing transactions) or `"recreate"` (drop and reinitialize). |
 | `DebugMode` | `bool` | `false` | Enable debug mode: skips actual HTTP requests to barrier APIs, logging `[DEBUG]` instead. Useful for testing without hardware actuation. |
 | `NoRelayCalls` | `bool` | `false` | Disable relay calls: same as `DebugMode` for pulsing, but only affects the relay HTTP requests (other processing continues normally). |
+| `DuplicateSuppressionWindowSeconds` | `int` | `5` | Time window in seconds for in-memory duplicate suppression on same VRM, lane, and direction. Prevents repeated camera detections from being processed as separate transactions. |
 
 **Notes:**
 
