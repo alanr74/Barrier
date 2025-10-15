@@ -10,6 +10,9 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Server.Kestrel.Core;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.Extensions.Logging;
 
 namespace Ava
 {
@@ -32,6 +35,18 @@ namespace Ava
             // Load and register configuration
             var appConfig = builder.Configuration.Get<AppConfig>() ?? new AppConfig();
             builder.Services.AddSingleton(appConfig);
+
+            // Configure web host URLs for API access from any IP
+            var apiPort = builder.Configuration.GetValue<int>("ApiPort", 8086);
+            builder.Logging.AddConsole();
+            builder.WebHost.UseKestrel(options =>
+            {
+                options.ListenAnyIP(apiPort); // HTTP only
+            });
+            Console.WriteLine($"Starting web host on port {apiPort}...");
+
+            // Add logging
+            builder.Logging.SetMinimumLevel(LogLevel.Information);
 
             // Add your services
             builder.Services.AddSingleton<Config>();
@@ -57,8 +72,21 @@ namespace Ava
             app.UseAuthorization();
             app.MapControllers();
 
-            // Start the web host in a background thread
-            var webHostTask = app.RunAsync();
+            // Start the web host in a background thread (but wait for it to start)
+            try
+            {
+                File.AppendAllText("api-host.log", $"[{DateTime.Now}] Starting web host on port {apiPort}...\n");
+                Console.WriteLine($"Starting web host on port {apiPort}...");
+                app.RunAsync();
+                File.AppendAllText("api-host.log", $"[{DateTime.Now}] Web host started successfully.\n");
+                Console.WriteLine("Web host started");
+            }
+            catch (Exception ex)
+            {
+                File.AppendAllText("api-host.log", $"[{DateTime.Now}] Web host failed to start: {ex.Message}\n{ex.StackTrace}\n");
+                Console.WriteLine("Web host start failed with exception.");
+                throw; // Re-throw to ensure app doesn't proceed
+            }
 
             // Start the Avalonia UI
             BuildAvaloniaApp()
